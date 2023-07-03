@@ -4,7 +4,7 @@
 #include <tuple>
 #include <array>
 #include <json/json.h>
-#include "../include/RestfulEzreal.h"
+#include "RestfulEzreal.h"
 
 #ifndef CONFIG_FILE_PATH
 	#define CONFIG_FILE_PATH "./EzrealRunes.json"
@@ -203,8 +203,8 @@ namespace restfulEz {
 					level_ = logging::LEVEL::WARNING;
 				}; // FIXME-TABLE: Selection overlap
 				ImGui::TableNextColumn();
-				if (ImGui::Selectable("ERRORS", level_ == logging::LEVEL::ERRORS)) {
-					level_ = logging::LEVEL::ERRORS;
+				if (ImGui::Selectable("ERROR", level_ == logging::LEVEL::ERROR)) {
+					level_ = logging::LEVEL::ERROR;
 				}; // FIXME-TABLE: Selection overlap
 				ImGui::TableNextColumn();
 				if (ImGui::Selectable("CRITICAL", level_ == logging::LEVEL::CRITICAL)) {
@@ -215,8 +215,7 @@ namespace restfulEz {
 			}
 			ImGui::Checkbox("Verbose Logging", &verbosity);
 
-			if (ImGui::Button("Submit")) {
-				config["api-key"] = api_key;
+			if (ImGui::Button("Submit")) { config["api-key"] = api_key;
 				config["log-path"] = path_to_log;
 				config["output-path"] = path_to_output;
 				config["verbosity"] = verbosity;

@@ -3,7 +3,7 @@
 #include <array>
 #include <memory>
 #include <stdlib.h>
-#include "../include/RestfulEzreal.h"
+#include "RestfulEzreal.h"
 
 #define _NO_FLAG ImGuiInputTextFlags_None
 #define _DEC_FLAG ImGuiInputTextFlags_CharsDecimal
