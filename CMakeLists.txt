@@ -8,7 +8,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(CURL REQUIRED)
 
 
-add_library(RestfulEzreal STATIC src/RestfulEzreal/endpoints.cpp src/RestfulEzreal/RestfulEzreal.cpp)
+add_library(RestfulEzreal STATIC 
+    src/RestfulEzreal/endpoints.cpp 
+    src/RestfulEzreal/LOL_endpoints.cpp
+    src/RestfulEzreal/TFT_endpoints.cpp
+    src/RestfulEzreal/LOR_endpoints.cpp
+    src/RestfulEzreal/VAL_endpoints.cpp
+    src/RestfulEzreal/RestfulEzreal.cpp)
+
 add_subdirectory(riot-cpp)
 add_subdirectory(Walnut)
 
