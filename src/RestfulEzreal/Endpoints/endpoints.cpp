@@ -22,9 +22,9 @@ namespace restfulEz {
             case 2: // TEAMFIGHT TACTICS
                 this->NewQueryFormTFT(end_name, endpoint_method); break;
             case 3: // VALORANT
-                this->NewQueryFormVAL(end_name, endpoint_method); break;
-            case 4: // LEGENDS OF RUNETERR
                 this->NewQueryFormLOR(end_name, endpoint_method); break;
+            case 4: // LEGENDS OF RUNETERR
+                this->NewQueryFormVAL(end_name, endpoint_method); break;
             default:
                 throw std::invalid_argument("Invalid Game Name");
         }
@@ -121,7 +121,7 @@ namespace restfulEz {
             }
             };
 
-            static const int Game_endpoint_length[5] = {1, 9, 4, 4, 3};
+            static const int Game_endpoint_length[5] = {1, 9, 4, 3, 4};
 
             static const int endpoint_lengths[5][9] = {
                 {3},

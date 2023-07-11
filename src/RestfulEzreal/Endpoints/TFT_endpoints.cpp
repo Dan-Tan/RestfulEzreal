@@ -60,13 +60,13 @@ namespace restfulEz {
     void RestfulEzreal::NewQueryFormTFT(int end_name, int endpoint_method) {
         switch (end_name) {
             case LEAGUE:
-                this->pushNewForm(Tft_League.at(endpoint_method));
+                this->pushNewForm(Tft_League.at(endpoint_method)); break;
             case MATCH:
-                this->pushNewForm(Tft_Match.at(endpoint_method));
+                this->pushNewForm(Tft_Match.at(endpoint_method)); break;
             case STATUS:
-                this->pushNewForm(Tft_Status.at(endpoint_method));
+                this->pushNewForm(Tft_Status.at(endpoint_method)); break;
             case SUMMONER:
-                this->pushNewForm(Tft_Summoner.at(endpoint_method));
+                this->pushNewForm(Tft_Summoner.at(endpoint_method)); break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index");
         }

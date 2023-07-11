@@ -40,13 +40,13 @@ namespace restfulEz {
         
         switch (end_name) {
             case CONTENT:
-                this->pushNewForm(Val_Content.at(endpoint_method));
+                this->pushNewForm(Val_Content.at(endpoint_method)); break;
             case MATCH:
-                this->pushNewForm(Val_Match.at(endpoint_method));
+                this->pushNewForm(Val_Match.at(endpoint_method)); break;
             case RANKED:
-                this->pushNewForm(Val_Ranked.at(endpoint_method));
+                this->pushNewForm(Val_Ranked.at(endpoint_method)); break;
             case STATUS:
-                this->pushNewForm(Val_Status.at(endpoint_method));
+                this->pushNewForm(Val_Status.at(endpoint_method)); break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index");
         }
