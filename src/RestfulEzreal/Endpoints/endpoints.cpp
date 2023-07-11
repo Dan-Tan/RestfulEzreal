@@ -3,7 +3,7 @@
 #include <array>
 #include <memory>
 #include <stdlib.h>
-#include "RestfulEzreal.h"
+#include "../RestfulEzreal.h"
 
 namespace restfulEz {
 

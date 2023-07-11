@@ -9,11 +9,11 @@ find_package(CURL REQUIRED)
 
 
 add_library(RestfulEzreal STATIC 
-    src/RestfulEzreal/endpoints.cpp 
-    src/RestfulEzreal/LOL_endpoints.cpp
-    src/RestfulEzreal/TFT_endpoints.cpp
-    src/RestfulEzreal/LOR_endpoints.cpp
-    src/RestfulEzreal/VAL_endpoints.cpp
+    src/RestfulEzreal/Endpoints/endpoints.cpp 
+    src/RestfulEzreal/Endpoints/LOL_endpoints.cpp
+    src/RestfulEzreal/Endpoints/TFT_endpoints.cpp
+    src/RestfulEzreal/Endpoints/LOR_endpoints.cpp
+    src/RestfulEzreal/Endpoints/VAL_endpoints.cpp
     src/RestfulEzreal/RestfulEzreal.cpp)
 
 add_subdirectory(riot-cpp)
