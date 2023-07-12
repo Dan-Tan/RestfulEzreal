@@ -4,3 +4,6 @@
 [submodule "Walnut"]
 	path = Walnut
 	url = git@github.com:Dan-Tan/Walnut.git
+[submodule "src/src_RestfulEzreal"]
+	path = src/src_RestfulEzreal
+	url = git@github.com:Dan-Tan/src_RestfulEzreal.git
