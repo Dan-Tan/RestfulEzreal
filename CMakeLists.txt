@@ -7,6 +7,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #find_package(jsoncpp REQUIRED)
 find_package(CURL REQUIRED)
 
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(MACOSX TRUE)
+endif()
 
 add_library(RestfulEzreal STATIC 
     src/RestfulEzreal/Endpoints/endpoints.cpp 
@@ -18,6 +21,14 @@ add_library(RestfulEzreal STATIC
 
 add_subdirectory(riot-cpp)
 add_subdirectory(Walnut)
+
+if (WIN32)
+    target_include_directories(RestfulEzreal PRIVATE ${VCPKG_INSTALLED_DIR}/include)
+endif()
+
+if (MACOSX)
+    target_include_directories(RestfulEzreal PRIVATE ${VCPKG_INSTALLED_DIR}/include)
+endif()
 
 target_include_directories(RestfulEzreal PRIVATE ${CURL_INCLUDE_DIRS})
 target_include_directories(RestfulEzreal PRIVATE ${jsoncpp_INCLUDE_DIRS})
