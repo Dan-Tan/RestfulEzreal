@@ -23,11 +23,13 @@ add_subdirectory(riot-cpp)
 add_subdirectory(Walnut)
 
 if (WIN32)
-    target_include_directories(RestfulEzreal PRIVATE ${VCPKG_INSTALLED_DIR}/include)
+    target_include_directories(RestfulEzreal PRIVATE ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
+    target_link_libraries(RestfulEzreal ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib)
 endif()
 
 if (MACOSX)
-    target_include_directories(RestfulEzreal PRIVATE ${VCPKG_INSTALLED_DIR}/include)
+    target_include_directories(RestfulEzreal PRIVATE ${VCPKG_INSTALLED_DIR}/{$VCPKG_TARGET_TRIPLET}/include)
+    target_link_libraries(RestfulEzreal ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib)
 endif()
 
 target_include_directories(RestfulEzreal PRIVATE ${CURL_INCLUDE_DIRS})
