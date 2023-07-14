@@ -68,7 +68,17 @@ The SDK to download can be found [here](https://vulkan.lunarg.com/)
 
 ### 4. Opening with visual studio from directory.
 
-Ideally you should open the project from the directory. Configure the CMAKE cache and the build.
+Open visual studio and select "Open a local folder" under get started on the right.
+
+Select the folder RestfulEzreal, this should be the directory you cloned.
+
+Under "Project", select "Configure Cache".
+
+Under "Build", select build all.
+
+In the directory, "RestfulEzreal/build/x64-Debug" there will be an executable (.exe) file that is the app.
+
+(Just "RestfuEzreal/build" if on linux)
 
 ## TODO:
 
