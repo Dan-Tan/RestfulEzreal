@@ -83,7 +83,7 @@ namespace restfulEz {
     static std::array<QUERY_FORM, 4> Champion_Mastery = {
         QUERY_FORM(2, LOL, CHAMPION_MASTERY, CM_BY_PUUID, "League of Legends", "Champion Mastery", "By Summoner Id", {"Routing","Summoner ID"},{_NO_FLAG,_NO_FLAG}),
         QUERY_FORM(3, LOL, CHAMPION_MASTERY, CM_BY_RIOT_ID, "League of Legends", "Champion Mastery", "By Summoner By Champion", {"Routing", "Summoner ID", "Champion ID"},{_NO_FLAG,_NO_FLAG,_DEC_FLAG}),
-        QUERY_FORM(3, LOL, CHAMPION_MASTERY, CM_BY_GAME_BY_PUUID, "League of Legends", "Champion Mastery", "Top By Summoner", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG}),
+        QUERY_FORM(2, LOL, CHAMPION_MASTERY, CM_BY_GAME_BY_PUUID, "League of Legends", "Champion Mastery", "Top By Summoner", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG}, true, {"count"}, {"3"}, {_DEC_FLAG}),
         QUERY_FORM(2, LOL, CHAMPION_MASTERY, CM_SCORE_BY_SUMMONER, "League of Legends", "Champion Mastery", "Score By Summoner", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG})
     };
     static std::array<QUERY_FORM, 1> Champion_Rotation = {
@@ -101,14 +101,14 @@ namespace restfulEz {
         QUERY_FORM(2, LOL, LEAGUE, MASTER, "League of Legends", "League", "Master", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG}),
         QUERY_FORM(2, LOL, LEAGUE, L_BY_SUMMONER_ID, "League of Legends", "League", "By Summoner ID", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG}),
         QUERY_FORM(2, LOL, LEAGUE, L_BY_LEAGUE_ID, "League of Legends", "League", "By League ID", {"Routing", "League ID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(4, LOL, LEAGUE, L_SPECIFIC_LEAGUE, "League of Legends", "League", "Specific League", {"Routing", "Queue", "Tier", "Division"}, {_NO_FLAG, _NO_FLAG, _NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(4, LOL, LEAGUE, L_EXPERIMENTAL, "League of Legends", "League", "Experimental", {"Routing", "Queue", "Tier", "Division"}, {_NO_FLAG, _NO_FLAG, _NO_FLAG, _NO_FLAG})
+        QUERY_FORM(4, LOL, LEAGUE, L_SPECIFIC_LEAGUE, "League of Legends", "League", "Specific League", {"Routing", "Queue", "Tier", "Division"}, {_NO_FLAG, _NO_FLAG, _NO_FLAG, _NO_FLAG}, true, {"page"}, {"1"}, {_DEC_FLAG}),
+        QUERY_FORM(4, LOL, LEAGUE, L_EXPERIMENTAL, "League of Legends", "League", "Experimental", {"Routing", "Queue", "Tier", "Division"}, {_NO_FLAG, _NO_FLAG, _NO_FLAG, _NO_FLAG}, true, {"page"}, {"1"}, {_DEC_FLAG})
     };
     static std::array<QUERY_FORM, 6> Challenges = {
         QUERY_FORM(1, LOL, CHALLENGES, CH_CONFIGURATION, "League of Legends", "Challenges", "Configuration", {"Routing"}, {_NO_FLAG}),
         QUERY_FORM(1, LOL, CHALLENGES, CH_PERCENTILES, "League of Legends", "Challenges", "Percentiles", {"Routing"}, {_NO_FLAG}),
         QUERY_FORM(2, LOL, CHALLENGES, CH_CH_CONFIGURATION, "League of Legends", "Challenges", "Challenge Configuration", {"Routing", "Challenge ID"}, {_NO_FLAG, _DEC_FLAG}),
-        QUERY_FORM(3, LOL, CHALLENGES, CH_CH_LEADERBOARD, "League of Legends", "Challenges", "Challenge Leaderboards", {"Routing", "Challenge ID", "Level"}, {_NO_FLAG, _DEC_FLAG, _NO_FLAG}),
+        QUERY_FORM(3, LOL, CHALLENGES, CH_CH_LEADERBOARD, "League of Legends", "Challenges", "Challenge Leaderboards", {"Routing", "Challenge ID", "Level"}, {_NO_FLAG, _DEC_FLAG, _NO_FLAG}, true, {"limit"}, {""}, {_DEC_FLAG}),
         QUERY_FORM(2, LOL, CHALLENGES, CH_CH_PERCENTILES, "League of Legends", "Challenges", "Challenge Percentiles", {"Routing", "Challenge ID"}, {_NO_FLAG, _DEC_FLAG}),
         QUERY_FORM(2, LOL, CHALLENGES, CH_BY_PUUID, "League of Legends", "Challenges", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG})
     };
@@ -119,7 +119,7 @@ namespace restfulEz {
     static std::array<QUERY_FORM, 3> Match = {
         QUERY_FORM(2, LOL, MATCH, M_BY_MATCH_ID, "League of Legends", "Match", "By Match ID", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG }),
         QUERY_FORM(2, LOL, MATCH, M_TIMELINE, "League of Legends", "Match", "Timeline", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, LOL, MATCH, M_BY_PUUID, "League of Legends", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG})
+        QUERY_FORM(2, LOL, MATCH, M_BY_PUUID, "League of Legends", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}, true, {"startTime", "endTime", "queue", "type", "start", "count"}, {"", "", "", "", "0", "20"}, {_DEC_FLAG, _DEC_FLAG, _DEC_FLAG, _NO_FLAG, _DEC_FLAG, _DEC_FLAG})
     };
     static std::array<QUERY_FORM, 5> Summoner = {
         QUERY_FORM(2, LOL, SUMMONER, S_BY_RSO_PUUID, "League of Legends", "Summoner", "By RSO Puuid", {"Routing", "RSO PUUID"}, {_NO_FLAG, _NO_FLAG}),

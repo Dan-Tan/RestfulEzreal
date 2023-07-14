@@ -60,6 +60,14 @@ namespace restfulEz {
             std::vector<PARAM_CONT> _params_in_form = {};
             std::vector<ImGuiInputTextFlags> _type_ordering;
 
+            bool _accepts_optional;
+            std::vector<P_NAME> _optional_names;
+            std::vector<PARAM_CONT> _optional_inputs;
+            std::vector<ImGuiInputTextFlags> _optional_types;
+            std::vector<int> _optionals_to_send; 
+
+            int _n_used_optional_p1 = 0;
+
             std::string _ID; // Distinguish Form from other Query Forms
 
             std::size_t _n_params;
@@ -73,7 +81,9 @@ namespace restfulEz {
         public:
             QUERY_FORM(const std::size_t n_params, const int game_ind, const int endpoint_ind, const int endpoint_method_ind, const char* game_name, 
                     const char* endpoint, const char* endpoint_method, 
-                    std::vector<P_NAME> param_names, std::vector<ImGuiInputTextFlags> type_ordering) 
+                    std::vector<P_NAME> param_names, std::vector<ImGuiInputTextFlags> type_ordering,
+                    bool accepts_optional = false, std::vector<P_NAME> optional_names = {}, 
+                    std::vector<PARAM_CONT> optional_inputs = {}, std::vector<ImGuiInputTextFlags> optional_types = {}) 
                 : _game_name(game_name), _endpoint(endpoint), _endpoint_method(endpoint_method)
             {
                 this->_n_params = n_params;
@@ -82,6 +92,17 @@ namespace restfulEz {
                 this->_type_ordering = type_ordering;
                 this->_params_in_form.resize(n_params);
 
+                this->_accepts_optional = accepts_optional;
+                this->_optional_names = optional_names;
+                this->_optional_inputs = optional_inputs;
+                this->_optional_types = optional_types;
+
+                for (int i = 0; i < optional_names.size(); i++) {
+                    this->_optionals_to_send.push_back(0);
+                }
+
+                if (this->_accepts_optional) {this->_n_used_optional_p1 = 1;}
+
                 this->_req_in_form = { game_ind, endpoint_ind, endpoint_method_ind };
             };
             ~QUERY_FORM() = default;
@@ -89,6 +110,7 @@ namespace restfulEz {
             std::string request_result = "";
 
             void render_form();
+            void render_optionals(bool already_send);
 
             void set_execute(bool* execute, QUERY_FORM** client_req, int ID) { 
                 this->_execute = execute; 

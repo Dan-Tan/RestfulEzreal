@@ -4,6 +4,7 @@
 #include <memory>
 #include <stdlib.h>
 #include "../RestfulEzreal.h"
+#include "imgui.h"
 
 namespace restfulEz {
 
@@ -34,7 +35,7 @@ namespace restfulEz {
     // Render Endpoint Submission Forms
     void QUERY_FORM::render_form() {
         float height_l = ImGui::GetFrameHeightWithSpacing();
-        ImGui::BeginChild(this->_ID.data(), ImVec2(ImGui::GetContentRegionAvail().x, (height_l * (this->_n_params + 2) + 3 * ImGui::GetStyle().ItemSpacing.y)), true, ImGuiWindowFlags_ChildWindow);
+        ImGui::BeginChild(this->_ID.data(), ImVec2(ImGui::GetContentRegionAvail().x, (height_l * (this->_n_params + this->_n_used_optional_p1 + 2) + 3 * ImGui::GetStyle().ItemSpacing.y)), true, ImGuiWindowFlags_ChildWindow);
         ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("My Button").x);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
@@ -46,12 +47,18 @@ namespace restfulEz {
             for (int i = 0; i < this->_n_params; i++) {
                 ImGui::InputText(this->_param_names[i], this->_params_in_form[i], 256, this->_type_ordering[i]);
             }
+            if (this->_accepts_optional) {
+                this->render_optionals(false);
+            }
         }
         else {
             ImVec4 disabled_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
             ImGui::PushStyleColor(ImGuiCol_Text, disabled_color);
             for (int i = 0; i < this->_n_params; i++) {
                 ImGui::InputText(this->_param_names[i], this->_params_in_form[i], 256, ImGuiInputTextFlags_ReadOnly);
+            }
+            if (this->_accepts_optional) {
+                this->render_optionals(true);
             }
             ImGui::PopStyleColor();
         }
@@ -70,6 +77,9 @@ namespace restfulEz {
                     this->form_execute = true;
                     *this->_client_req = this;
                 }
+                if (this->_accepts_optional) {
+                    this->render_optionals(false);
+                }
             }
         }
         else {
@@ -79,6 +89,67 @@ namespace restfulEz {
         }
         ImGui::EndChild();
     };	
+
+    void QUERY_FORM::render_optionals(bool already_sent) {
+        if (!this->_accepts_optional) {
+            throw std::logic_error("QUERY_FORM::render_optional should never be called for endpoints with no optional arguements");
+        }
+
+        char id[4] = "x# ";
+
+        if (already_sent) {
+            ImVec4 disabled_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
+            ImGui::PushStyleColor(ImGuiCol_Text, disabled_color);
+            for (int i = 0; i < this->_optionals_to_send.size(); i++) {
+                if (this->_optionals_to_send[i] == 1) {
+                    ImGui::InputText(this->_optional_names[i], this->_optional_inputs[i], 256, ImGuiInputTextFlags_ReadOnly);
+                }
+            }
+            ImGui::PopStyleColor();
+        } else {
+            for (int i = 0; i < this->_optionals_to_send.size(); i++) {
+                if (this->_optionals_to_send[i]) {
+                    ImGui::InputText(this->_optional_names[i], this->_optional_inputs[i], 256, this->_optional_types[i]);
+                    ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("x").x);
+                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
+                    if (ImGui::Button(id)) {
+                        this->_optionals_to_send[i] = 0;
+                        this->_n_used_optional_p1 -= 1;
+                    };
+                }
+            }
+        }
+        float drop_down_width = (0.3f * ImGui::GetContentRegionAvail().x);
+        ImGui::SetNextItemWidth(drop_down_width);
+        static int opt_index = 0;
+        if (ImGui::BeginCombo("##OPTIONAL", this->_optional_names[opt_index], ImGuiComboFlags_None))
+        {
+            for (int n = 0; n < this->_optional_names.size(); n++)
+            {
+                if (this->_optionals_to_send[n] == 0) {
+                    const bool is_selected = (opt_index == n);
+                    if (ImGui::Selectable(this->_optional_names[n], is_selected)) {
+                        opt_index = n;
+                    }
+
+                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                    if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        // Render add optional button besides dropdown
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("Add Optional").x);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
+        if (ImGui::Button("Add Optional")) {
+            if (this->_optionals_to_send[opt_index] == 0) {this->_n_used_optional_p1 += 1;};
+            this->_optionals_to_send[opt_index] = 1;
+        }
+
+    }
 
     void RestfulEzreal::NewFormButton() {
 

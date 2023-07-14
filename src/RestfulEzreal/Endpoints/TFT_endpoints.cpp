@@ -41,10 +41,10 @@ namespace restfulEz {
         QUERY_FORM(2, TFT, LEAGUE, L_BY_SUMMONER_ID, "Teamfight Tactics", "League", "By Summoner ID", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG}),
         QUERY_FORM(2, TFT, LEAGUE, L_BY_LEAGUE_ID, "Teamfight Tactics", "League", "By League ID", {"Routing", "League ID"}, {_NO_FLAG, _NO_FLAG}),
         QUERY_FORM(2, TFT, LEAGUE, QUEUE_TOP, "Teamfight Tactics", "League", "Queue Top", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(3, TFT, LEAGUE, L_BY_TIER_DIVISION, "Teamfight Tactics", "League", "By Tier Division", {"Routing", "Tier", "Divisionk"}, {_NO_FLAG, _NO_FLAG, _NO_FLAG})
+        QUERY_FORM(3, TFT, LEAGUE, L_BY_TIER_DIVISION, "Teamfight Tactics", "League", "By Tier Division", {"Routing", "Tier", "Divisionk"}, {_NO_FLAG, _NO_FLAG, _NO_FLAG}, true, {"count"}, {"1"}, {_DEC_FLAG})
     };
     static std::array<QUERY_FORM, 2> Tft_Match = {
-        QUERY_FORM(2, TFT, MATCH, M_BY_PUUID, "Teamfight Tactics", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}),
+        QUERY_FORM(2, TFT, MATCH, M_BY_PUUID, "Teamfight Tactics", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}, true, {"start", "endTime", "startTime", "count"}, {"0", "", "", "20"}, {_DEC_FLAG, _DEC_FLAG, _DEC_FLAG, _DEC_FLAG}),
         QUERY_FORM(2, TFT, MATCH, M_BY_MATCH_ID, "Teamfight Tactics", "Match", "By Match ID", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG})
     };
     static std::array<QUERY_FORM, 1> Tft_Status = {

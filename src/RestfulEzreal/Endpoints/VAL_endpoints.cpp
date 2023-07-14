@@ -22,7 +22,7 @@
 
 namespace restfulEz {
     static std::array<QUERY_FORM, 1> Val_Content = {
-        QUERY_FORM(1, 4, 0, 1, "Valorant", "Content", "Content", {"Routing"}, {_NO_FLAG})
+        QUERY_FORM(1, 4, 0, 1, "Valorant", "Content", "Content", {"Routing"}, {_NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG})
     };
     static std::array<QUERY_FORM, 3> Val_Match = {
         QUERY_FORM(2, 4, 1, 0, "Valorant", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}),
@@ -30,7 +30,7 @@ namespace restfulEz {
         QUERY_FORM(2, 4, 1, 2, "Valorant", "Match", "By Queue", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG})
     };
     static std::array<QUERY_FORM, 1> Val_Ranked = {
-        QUERY_FORM(2, 4, 2, 0, "Valorant", "Ranked", "By Act", {"Routing", "Act ID"}, {_NO_FLAG, _NO_FLAG})
+        QUERY_FORM(2, 4, 2, 0, "Valorant", "Ranked", "By Act", {"Routing", "Act ID"}, {_NO_FLAG, _NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG})
     };
     static std::array<QUERY_FORM, 1> Val_Status = {
         QUERY_FORM(1, 4, 3, 0, "Valorant", "Status", "Status", {"Routing"}, {_NO_FLAG})
