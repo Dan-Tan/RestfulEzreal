@@ -4,3 +4,4 @@ build
 *.user
 .cache
 .vs
+!build/imgui.ini
