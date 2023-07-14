@@ -3,3 +3,4 @@ build
 *.filters
 *.user
 .cache
+.vs
