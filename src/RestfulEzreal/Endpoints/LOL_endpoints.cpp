@@ -1,7 +1,7 @@
 #include "Walnut/Application.h"
 #include "../RestfulEzreal.h"
 #include <array>
-
+#include <utility>
 // GAME
 #define LOL 1
 
@@ -162,6 +162,8 @@ namespace restfulEz {
         Json::Value response;
 
         std::vector<PARAM_CONT>& params = this->_next_request->_req_in_form.params;
+        std::vector<P_NAME>& opt_names = this->_next_request->_req_in_form.optional_names; // WARNING MIGHT NOT BE INITIALISED/EMPTY
+        std::vector<PARAM_CONT>& opt_inputs = this->_next_request->_req_in_form.optional_inputs; // WARNING MIGHT NOT BE INITIALISED/EMPTY
         const int endpoint = this->_next_request->_req_in_form._endpoint;
         const int endpoint_method = this->_next_request->_req_in_form._endpoint_method;
 
@@ -173,9 +175,9 @@ namespace restfulEz {
                     case CM_BY_RIOT_ID:
                         response = this->_underlying_client->Champion_Mastery.by_summoner_by_champion(params.at(0), params.at(1), atoi(params.at(2))); break;
                     case CM_BY_GAME_BY_PUUID:
-                        response = this->_underlying_client->Champion_Mastery.by_summoner_id(params.at(0), params.at(1)); break;
+                        response = this->_underlying_client->Champion_Mastery.by_summoner_top(params.at(0), params.at(1), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                     case CM_SCORE_BY_SUMMONER:
-                        response = this->_underlying_client->Champion_Mastery.by_summoner_id(params.at(0), params.at(1)); break;
+                        response = this->_underlying_client->Champion_Mastery.scores_by_summoner(params.at(0), params.at(1)); break;
                 } break;
             case CHAMPION_ROTATION: // Champion Rotation
                 response = this->_underlying_client->Champion.rotations(params.at(0));break;
@@ -203,9 +205,9 @@ namespace restfulEz {
                     case L_BY_LEAGUE_ID:
                         response = this->_underlying_client->League.by_league_id(params.at(0), params.at(1)); break;
                     case L_SPECIFIC_LEAGUE:
-                        response = this->_underlying_client->League.specific_league(params.at(0), params.at(1), params.at(2), params.at(3));;; break;
+                        response = this->_underlying_client->League.specific_league(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break; 
                     case L_EXPERIMENTAL:
-                        response = this->_underlying_client->League_Exp.entries(params.at(0), params.at(1), params.at(2), params.at(3)); break;
+                        response = this->_underlying_client->League_Exp.entries(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                 }break;
             case CHALLENGES: // Challenges
                 switch (endpoint_method) {
@@ -216,7 +218,7 @@ namespace restfulEz {
                     case CH_CH_CONFIGURATION:
                         response = this->_underlying_client->Lol_Challenges.challenge_config(params.at(0), atoi(params.at(1))); break;
                     case CH_CH_LEADERBOARD:
-                        response = this->_underlying_client->Lol_Challenges.challenge_leaderboard(params.at(0), atoi(params.at(2)), params.at(2)); break;
+                        response = this->_underlying_client->Lol_Challenges.challenge_leaderboard(params.at(0), atoi(params.at(2)), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                     case CH_CH_PERCENTILES:
                         response = this->_underlying_client->Lol_Challenges.challenge_percentiles(params.at(0), atoi(params.at(1))); break;
                     case CH_BY_PUUID:
@@ -236,7 +238,14 @@ namespace restfulEz {
                     case M_TIMELINE:
                         response = this->_underlying_client->Match.timeline(params.at(0), params.at(1)); break;
                     case M_BY_PUUID:
-                        response = this->_underlying_client->Match.by_puuid(params.at(0), params.at(1), { "", "" }); break;
+                        response = this->_underlying_client->Match.by_puuid(params.at(0), params.at(1), 
+                                std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)),
+                                std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
+                                std::pair<std::string, int>(opt_names.at(2), atoi(opt_inputs.at(2))),
+                                std::pair<std::string, int>(opt_names.at(3), atoi(opt_inputs.at(3))),
+                                std::pair<std::string, int>(opt_names.at(4), atoi(opt_inputs.at(4))),
+                                std::pair<std::string, int>(opt_names.at(5), atoi(opt_inputs.at(5)))
+                                ); break;
                 }break;
             case SUMMONER: // Summoner
                 switch (endpoint_method) {

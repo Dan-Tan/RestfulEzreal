@@ -80,7 +80,4 @@ In the directory, "RestfulEzreal/build/x64-Debug" there will be an executable (.
 
 (Just "RestfuEzreal/build" if on linux)
 
-## TODO:
-
-Create build instructions so other people can work on it.
 

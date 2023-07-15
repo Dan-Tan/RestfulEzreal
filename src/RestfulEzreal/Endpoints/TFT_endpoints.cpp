@@ -2,6 +2,7 @@
 #include <array>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 #define TFT 2
 
@@ -76,6 +77,8 @@ namespace restfulEz {
         Json::Value response;
 
         std::vector<PARAM_CONT>& params = this->_next_request->_req_in_form.params;
+        std::vector<P_NAME>& opt_names = this->_next_request->_req_in_form.optional_names;
+        std::vector<PARAM_CONT>& opt_inputs = this->_next_request->_req_in_form.optional_inputs;
         const int endpoint = this->_next_request->_req_in_form._endpoint;
         const int endpoint_method = this->_next_request->_req_in_form._endpoint_method;
         try {
@@ -95,14 +98,19 @@ namespace restfulEz {
                         case QUEUE_TOP:
                             response = this->_underlying_client->Tft_League.queue_top(params.at(0), params.at(1));break;
                         case L_BY_TIER_DIVISION:
-                            response = this->_underlying_client->Tft_League.by_tier_division(params.at(0), params.at(1), params.at(2));break;
+                            response = this->_underlying_client->Tft_League.by_tier_division(params.at(0), params.at(1), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))));break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method Index Given for Tft_League");
                     } break;
                 case MATCH:
                     switch (endpoint_method) {
                         case M_BY_PUUID:
-                            response = this->_underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1));break;
+                            response = this->_underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), 
+                                    std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))),
+                                    std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
+                                    std::pair<std::string, int>(opt_names.at(2), atoi(opt_inputs.at(2))),
+                                    std::pair<std::string, int>(opt_names.at(3), atoi(opt_inputs.at(3)))
+                                        );break;
                         case M_BY_MATCH_ID:
                             response = this->_underlying_client->Tft_Match.by_match(params.at(0), params.at(1));break;
                     } break;

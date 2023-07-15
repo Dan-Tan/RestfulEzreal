@@ -1,6 +1,7 @@
 #include "../RestfulEzreal.h"
 #include <array>
 #include <sstream>
+#include <utility>
 
 #define VAL 4
 
@@ -56,12 +57,14 @@ namespace restfulEz {
         Json::Value response;
 
         std::vector<PARAM_CONT>& params = this->_next_request->_req_in_form.params;
+        std::vector<P_NAME>& opt_names = this->_next_request->_req_in_form.optional_names;
+        std::vector<PARAM_CONT>& opt_inputs = this->_next_request->_req_in_form.optional_inputs;
         const int endpoint = this->_next_request->_req_in_form._endpoint;
         const int endpoint_method = this->_next_request->_req_in_form._endpoint_method;
 
         switch (endpoint) {
             case CONTENT:
-                response = this->_underlying_client->Val_Content.content(params.at(0));break;
+                response = this->_underlying_client->Val_Content.content(params.at(0), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
             case MATCH:
                 switch (endpoint_method) {
                     case BY_MATCH:
@@ -74,7 +77,7 @@ namespace restfulEz {
                         throw std::invalid_argument("Invalid Endpoint Method Index Given");
                 } break;
             case RANKED:
-                response = this->_underlying_client->Val_Ranked.by_act(params.at(0), params.at(1));break;
+                response = this->_underlying_client->Val_Ranked.by_act(params.at(0), params.at(1), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
             case STATUS:
                 response = this->_underlying_client->Val_Status.platform_data(params.at(0));break;
             default:

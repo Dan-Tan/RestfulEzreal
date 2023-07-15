@@ -47,6 +47,8 @@ namespace restfulEz {
         int _endpoint_method;
 
         std::vector<PARAM_CONT> params;
+        std::vector<P_NAME> optional_names;
+        std::vector<PARAM_CONT> optional_inputs;
     }request;
 
 

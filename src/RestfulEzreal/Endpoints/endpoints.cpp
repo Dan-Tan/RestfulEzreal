@@ -70,8 +70,19 @@ namespace restfulEz {
                     empty |= strlen(this->_params_in_form[i].param) == 0;
                 }
                 if (!empty) {
-                    for (int i = 0; i < this->_n_params; i++) {
+                    for (int i = 0; i < this->_n_params; i++) { // add inputs into the request structure
                         this->_req_in_form.params.push_back(this->_params_in_form[i]);
+                    }
+                    if (this->_accepts_optional) { // add optional inputs into the request structure
+                        for (int i = 0; this->_optional_names.size(); i++) {
+                            if (this->_optionals_to_send[i]) { // check which inputs to send
+                                this->_req_in_form.optional_names.push_back(this->_optional_names[i]);
+                                this->_req_in_form.optional_inputs.push_back(this->_optional_inputs[i]);
+                            } else {
+                                this->_req_in_form.optional_names.push_back(""); // giving empty string makes the underlying client not send the request
+                                this->_req_in_form.optional_inputs.push_back("0");
+                            }
+                        }
                     }
                     *this->_execute = true;
                     this->form_execute = true;
