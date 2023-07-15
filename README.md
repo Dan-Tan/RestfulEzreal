@@ -80,4 +80,13 @@ In the directory, "RestfulEzreal/build/x64-Debug" there will be an executable (.
 
 (Just "RestfuEzreal/build" if on linux)
 
+If on linux. 
+
+```bash
+# assuming current directory is RestfulEzreal (root of project)
+mkdir build & cd build
+cmake ..
+make
+```
+
 

@@ -74,7 +74,7 @@ namespace restfulEz {
                         this->_req_in_form.params.push_back(this->_params_in_form[i]);
                     }
                     if (this->_accepts_optional) { // add optional inputs into the request structure
-                        for (int i = 0; this->_optional_names.size(); i++) {
+                        for (int i = 0; i < this->_optional_names.size(); i++) {
                             if (this->_optionals_to_send[i]) { // check which inputs to send
                                 this->_req_in_form.optional_names.push_back(this->_optional_names[i]);
                                 this->_req_in_form.optional_inputs.push_back(this->_optional_inputs[i]);
@@ -328,11 +328,11 @@ namespace restfulEz {
         Json::StreamWriterBuilder builder;
         output << Json::writeString(builder, response);
         output.close();
-
-        if (response.isMember("status")) {
+        if (response.isArray()) {
+            this->_next_request->request_result = "Successful";
+        } else if (response.isMember("status")) {
             this->_next_request->request_result = response["status"]["message"].asString();
-        }
-        else {
+        } else {
             this->_next_request->request_result = "Successful";
         }
     }
