@@ -17,6 +17,7 @@ add_library(RestfulEzreal STATIC
     src/RestfulEzreal/Endpoints/TFT_endpoints.cpp
     src/RestfulEzreal/Endpoints/LOR_endpoints.cpp
     src/RestfulEzreal/Endpoints/VAL_endpoints.cpp
+    src/RestfulEzreal/QueryForm.cpp
     src/RestfulEzreal/RestfulEzreal.cpp)
 
 add_subdirectory(riot-cpp/src)
