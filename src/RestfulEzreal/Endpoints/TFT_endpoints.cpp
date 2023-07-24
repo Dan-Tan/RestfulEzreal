@@ -1,3 +1,4 @@
+#include "../RequestQueue.h"
 #include "../RestfulEzreal.h"
 #include <array>
 #include <sstream>
@@ -73,59 +74,59 @@ namespace restfulEz {
         }
     }
 
-    Json::Value RestfulEzreal::Send_TFT() {
+    void RequestSender::Send_TFT(request& task) {
         Json::Value response;
 
-        std::vector<PARAM_CONT>& params = this->_next_request->_req_in_form.params;
-        std::vector<P_NAME>& opt_names = this->_next_request->_req_in_form.optional_names;
-        std::vector<PARAM_CONT>& opt_inputs = this->_next_request->_req_in_form.optional_inputs;
-        const int endpoint = this->_next_request->_req_in_form._endpoint;
-        const int endpoint_method = this->_next_request->_req_in_form._endpoint_method;
+        std::vector<PARAM_CONT>& params = task.params;
+        std::vector<P_NAME>& opt_names = task.optional_names;
+        std::vector<PARAM_CONT>& opt_inputs = task.optional_inputs;
+        const int endpoint = task._endpoint;
+        const int endpoint_method = task._endpoint_method;
         try {
             switch (endpoint) {
                 case LEAGUE:
                     switch (endpoint_method) {
                         case CHALLENGER:
-                            response = this->_underlying_client->Tft_League.challenger(params.at(0));break;
+                            task.response = this->underlying_client->Tft_League.challenger(params.at(0));break;
                         case GRANDMASTER:
-                            response = this->_underlying_client->Tft_League.grandmaster(params.at(0));break;
+                            task.response = this->underlying_client->Tft_League.grandmaster(params.at(0));break;
                         case MASTER:
-                            response = this->_underlying_client->Tft_League.master(params.at(0));break;
+                            task.response = this->underlying_client->Tft_League.master(params.at(0));break;
                         case L_BY_SUMMONER_ID:
-                            response = this->_underlying_client->Tft_League.by_summoner_id(params.at(0), params.at(1));break;
+                            task.response = this->underlying_client->Tft_League.by_summoner_id(params.at(0), params.at(1));break;
                         case L_BY_LEAGUE_ID:
-                            response = this->_underlying_client->Tft_League.by_league_id(params.at(0), params.at(1));break;
+                            task.response = this->underlying_client->Tft_League.by_league_id(params.at(0), params.at(1));break;
                         case QUEUE_TOP:
-                            response = this->_underlying_client->Tft_League.queue_top(params.at(0), params.at(1));break;
+                            task.response = this->underlying_client->Tft_League.queue_top(params.at(0), params.at(1));break;
                         case L_BY_TIER_DIVISION:
-                            response = this->_underlying_client->Tft_League.by_tier_division(params.at(0), params.at(1), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))));break;
+                            task.response = this->underlying_client->Tft_League.by_tier_division(params.at(0), params.at(1), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))));break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method Index Given for Tft_League");
                     } break;
                 case MATCH:
                     switch (endpoint_method) {
                         case M_BY_PUUID:
-                            response = this->_underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), 
+                            task.response = this->underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), 
                                     std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))),
                                     std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
                                     std::pair<std::string, int>(opt_names.at(2), atoi(opt_inputs.at(2))),
                                     std::pair<std::string, int>(opt_names.at(3), atoi(opt_inputs.at(3)))
                                         );break;
                         case M_BY_MATCH_ID:
-                            response = this->_underlying_client->Tft_Match.by_match(params.at(0), params.at(1));break;
+                            task.response = this->underlying_client->Tft_Match.by_match(params.at(0), params.at(1));break;
                     } break;
                 case STATUS:
-                    response = this->_underlying_client->Tft_Status.v1(params.at(0));break;
+                    task.response = this->underlying_client->Tft_Status.v1(params.at(0));break;
                 case SUMMONER:
                     switch (endpoint_method) {
                         case S_BY_ACCOUNT_ID:
-                            response = this->_underlying_client->Tft_Summoner.by_account(params.at(0), params.at(1));break;
+                            task.response = this->underlying_client->Tft_Summoner.by_account(params.at(0), params.at(1));break;
                         case S_BY_NAME:
-                            response = this->_underlying_client->Tft_Summoner.by_name(params.at(0), params.at(1));break;
+                            task.response = this->underlying_client->Tft_Summoner.by_name(params.at(0), params.at(1));break;
                         case S_BY_PUUID:
-                            response = this->_underlying_client->Tft_Summoner.by_puuid(params.at(0), params.at(1));break;
+                            task.response = this->underlying_client->Tft_Summoner.by_puuid(params.at(0), params.at(1));break;
                         case S_BY_SUMMONER_ID:
-                            response = this->_underlying_client->Tft_Summoner.by_summoner_id(params.at(0), params.at(1));break;
+                            task.response = this->underlying_client->Tft_Summoner.by_summoner_id(params.at(0), params.at(1));break;
                     } break;
                 default:
                     throw std::invalid_argument("Invaid Endpoint Index given");
@@ -136,7 +137,5 @@ namespace restfulEz {
             ss << ex.what() << " Tried to index too many parameters";
             throw std::out_of_range(ss.str());
         }
-
-        return response;
     }
 }

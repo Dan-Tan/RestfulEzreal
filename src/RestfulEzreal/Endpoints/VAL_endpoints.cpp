@@ -1,3 +1,4 @@
+#include "../RequestQueue.h"
 #include "../RestfulEzreal.h"
 #include <array>
 #include <sstream>
@@ -53,36 +54,35 @@ namespace restfulEz {
         }
     }
 
-    Json::Value RestfulEzreal::Send_VAL() {
+    void RequestSender::Send_VAL(request& task) {
         Json::Value response;
 
-        std::vector<PARAM_CONT>& params = this->_next_request->_req_in_form.params;
-        std::vector<P_NAME>& opt_names = this->_next_request->_req_in_form.optional_names;
-        std::vector<PARAM_CONT>& opt_inputs = this->_next_request->_req_in_form.optional_inputs;
-        const int endpoint = this->_next_request->_req_in_form._endpoint;
-        const int endpoint_method = this->_next_request->_req_in_form._endpoint_method;
+        std::vector<PARAM_CONT>& params = task.params;
+        std::vector<P_NAME>& opt_names = task.optional_names;
+        std::vector<PARAM_CONT>& opt_inputs = task.optional_inputs;
+        const int endpoint = task._endpoint;
+        const int endpoint_method = task._endpoint_method;
 
         switch (endpoint) {
             case CONTENT:
-                response = this->_underlying_client->Val_Content.content(params.at(0), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
+                task.response = this->underlying_client->Val_Content.content(params.at(0), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
             case MATCH:
                 switch (endpoint_method) {
                     case BY_MATCH:
-                        response = this->_underlying_client->Val_Match.by_match(params.at(0), params.at(1));break;
+                        task.response = this->underlying_client->Val_Match.by_match(params.at(0), params.at(1));break;
                     case BY_PUUID:
-                        response = this->_underlying_client->Val_Match.by_puuid(params.at(0), params.at(1));break;
+                        task.response = this->underlying_client->Val_Match.by_puuid(params.at(0), params.at(1));break;
                     case BY_QUEUE:
-                        response = this->_underlying_client->Val_Match.by_queue(params.at(0), params.at(1));break;
+                        task.response = this->underlying_client->Val_Match.by_queue(params.at(0), params.at(1));break;
                     default:
                         throw std::invalid_argument("Invalid Endpoint Method Index Given");
                 } break;
             case RANKED:
-                response = this->_underlying_client->Val_Ranked.by_act(params.at(0), params.at(1), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
+                task.response = this->underlying_client->Val_Ranked.by_act(params.at(0), params.at(1), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
             case STATUS:
-                response = this->_underlying_client->Val_Status.platform_data(params.at(0));break;
+                task.response = this->underlying_client->Val_Status.platform_data(params.at(0));break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index Given");
         }
-        return response;
     }
 }

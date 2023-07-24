@@ -1,39 +1,11 @@
 #pragma once
 #include "Walnut/Application.h"
+#include "BatchRequests.h"
 #include <vector>
 #include <string>
 #include <cstring>
 
 namespace restfulEz {
-
-    typedef struct P_NAME {
-        char name[32] = { 0 };
-        operator char* () { return name; }
-        P_NAME() {};
-        P_NAME(const char* str) {
-            strncpy(name, str, sizeof(str));
-        };
-    }P_NAME;
-
-    typedef struct PARAM_CONT {
-        char param[256] = {0};
-        operator char*() { return param; };
-        operator std::string() { return std::string(param); };
-        PARAM_CONT() {};
-        PARAM_CONT(const char* str) {
-            strncpy(param, str, sizeof(str));
-        };
-    }PARAM_CONT;
-
-    typedef struct request {
-        int _game;
-        int _endpoint;
-        int _endpoint_method;
-
-        std::vector<PARAM_CONT> params;
-        std::vector<P_NAME> optional_names;
-        std::vector<PARAM_CONT> optional_inputs;
-    }request;
 
 
     class QUERY_FORM {

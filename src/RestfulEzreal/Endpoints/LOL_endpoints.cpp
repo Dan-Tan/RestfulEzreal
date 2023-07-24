@@ -1,4 +1,5 @@
 #include "Walnut/Application.h"
+#include "../RequestQueue.h"
 #include "../RestfulEzreal.h"
 #include <array>
 #include <utility>
@@ -158,87 +159,87 @@ namespace restfulEz {
 
     };
 
-    Json::Value RestfulEzreal::Send_LOL() {
+    void RequestSender::Send_LOL(request& task) {
         Json::Value response;
 
-        std::vector<PARAM_CONT>& params = this->_next_request->_req_in_form.params;
-        std::vector<P_NAME>& opt_names = this->_next_request->_req_in_form.optional_names; // WARNING MIGHT NOT BE INITIALISED/EMPTY
-        std::vector<PARAM_CONT>& opt_inputs = this->_next_request->_req_in_form.optional_inputs; // WARNING MIGHT NOT BE INITIALISED/EMPTY
-        const int endpoint = this->_next_request->_req_in_form._endpoint;
-        const int endpoint_method = this->_next_request->_req_in_form._endpoint_method;
+        std::vector<PARAM_CONT>& params = task.params;
+        std::vector<P_NAME>& opt_names = task.optional_names; // WARNING MIGHT NOT BE INITIALISED/EMPTY
+        std::vector<PARAM_CONT>& opt_inputs = task.optional_inputs; // WARNING MIGHT NOT BE INITIALISED/EMPTY
+        const int endpoint = task._endpoint;
+        const int endpoint_method = task._endpoint_method;
 
         switch (endpoint) {
             case CHAMPION_MASTERY: // Champion Mastery
                 switch (endpoint_method) {
                     case CM_BY_PUUID:
-                        response = this->_underlying_client->Champion_Mastery.by_summoner_id(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Champion_Mastery.by_summoner_id(params.at(0), params.at(1)); break;
                     case CM_BY_RIOT_ID:
-                        response = this->_underlying_client->Champion_Mastery.by_summoner_by_champion(params.at(0), params.at(1), atoi(params.at(2))); break;
+                        task.response = this->underlying_client->Champion_Mastery.by_summoner_by_champion(params.at(0), params.at(1), atoi(params.at(2))); break;
                     case CM_BY_GAME_BY_PUUID:
-                        response = this->_underlying_client->Champion_Mastery.by_summoner_top(params.at(0), params.at(1), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
+                        task.response = this->underlying_client->Champion_Mastery.by_summoner_top(params.at(0), params.at(1), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                     case CM_SCORE_BY_SUMMONER:
-                        response = this->_underlying_client->Champion_Mastery.scores_by_summoner(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Champion_Mastery.scores_by_summoner(params.at(0), params.at(1)); break;
                 } break;
             case CHAMPION_ROTATION: // Champion Rotation
-                response = this->_underlying_client->Champion.rotations(params.at(0));break;
+                task.response = this->underlying_client->Champion.rotations(params.at(0));break;
             case CLASH: // Clash
                 switch (endpoint_method) {
                     case CL_BY_SUMMONER_ID:
-                        response = this->_underlying_client->Clash.by_summoner_id(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Clash.by_summoner_id(params.at(0), params.at(1)); break;
                     case CL_BY_TEAM:
-                        response = this->_underlying_client->Clash.by_team(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Clash.by_team(params.at(0), params.at(1)); break;
                     case CL_TOURNAMENT_BY_TEAM:
-                        response = this->_underlying_client->Clash.tournament_by_team(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Clash.tournament_by_team(params.at(0), params.at(1)); break;
                     case CL_BY_TOURNAMENT:
-                        response = this->_underlying_client->Clash.by_tournament(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Clash.by_tournament(params.at(0), params.at(1)); break;
                 }break;
             case LEAGUE: // League
                 switch (endpoint_method) {
                     case CHALLENGER:
-                        response = this->_underlying_client->League.challenger(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->League.challenger(params.at(0), params.at(1)); break;
                     case GRANDMASTER:
-                        response = this->_underlying_client->League.grandmaster(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->League.grandmaster(params.at(0), params.at(1)); break;
                     case MASTER:
-                        response = this->_underlying_client->League.master(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->League.master(params.at(0), params.at(1)); break;
                     case L_BY_SUMMONER_ID:
-                        response = this->_underlying_client->League.by_summoner_id(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->League.by_summoner_id(params.at(0), params.at(1)); break;
                     case L_BY_LEAGUE_ID:
-                        response = this->_underlying_client->League.by_league_id(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->League.by_league_id(params.at(0), params.at(1)); break;
                     case L_SPECIFIC_LEAGUE:
-                        response = this->_underlying_client->League.specific_league(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break; 
+                        task.response = this->underlying_client->League.specific_league(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break; 
                     case L_EXPERIMENTAL:
-                        response = this->_underlying_client->League_Exp.entries(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
+                        task.response = this->underlying_client->League_Exp.entries(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                 }break;
             case CHALLENGES: // Challenges
                 switch (endpoint_method) {
                     case CH_CONFIGURATION:
-                        response = this->_underlying_client->Lol_Challenges.config(params.at(0)); break;
+                        task.response = this->underlying_client->Lol_Challenges.config(params.at(0)); break;
                     case CH_PERCENTILES:
-                        response = this->_underlying_client->Lol_Challenges.percentiles(params.at(0)); break;
+                        task.response = this->underlying_client->Lol_Challenges.percentiles(params.at(0)); break;
                     case CH_CH_CONFIGURATION:
-                        response = this->_underlying_client->Lol_Challenges.challenge_config(params.at(0), atoi(params.at(1))); break;
+                        task.response = this->underlying_client->Lol_Challenges.challenge_config(params.at(0), atoi(params.at(1))); break;
                     case CH_CH_LEADERBOARD:
-                        response = this->_underlying_client->Lol_Challenges.challenge_leaderboard(params.at(0), atoi(params.at(2)), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
+                        task.response = this->underlying_client->Lol_Challenges.challenge_leaderboard(params.at(0), atoi(params.at(2)), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                     case CH_CH_PERCENTILES:
-                        response = this->_underlying_client->Lol_Challenges.challenge_percentiles(params.at(0), atoi(params.at(1))); break;
+                        task.response = this->underlying_client->Lol_Challenges.challenge_percentiles(params.at(0), atoi(params.at(1))); break;
                     case CH_BY_PUUID:
-                        response = this->_underlying_client->Lol_Challenges.by_puuid(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Lol_Challenges.by_puuid(params.at(0), params.at(1)); break;
                 }break;
             case STATUS: // Lol_Status
                 switch (endpoint_method) {
                     case V4:
-                        response = this->_underlying_client->Lol_Status.v4(params.at(0)); break;
+                        task.response = this->underlying_client->Lol_Status.v4(params.at(0)); break;
                     case V3:
-                        response = this->_underlying_client->Lol_Status.v3(params.at(0)); break;
+                        task.response = this->underlying_client->Lol_Status.v3(params.at(0)); break;
                 }break;
             case MATCH: // Match
                 switch (endpoint_method) {
                     case M_BY_MATCH_ID:
-                        response = this->_underlying_client->Match.by_match_id(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Match.by_match_id(params.at(0), params.at(1)); break;
                     case M_TIMELINE:
-                        response = this->_underlying_client->Match.timeline(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Match.timeline(params.at(0), params.at(1)); break;
                     case M_BY_PUUID:
-                        response = this->_underlying_client->Match.by_puuid(params.at(0), params.at(1), 
+                        task.response = this->underlying_client->Match.by_puuid(params.at(0), params.at(1), 
                                 std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)),
                                 std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
                                 std::pair<std::string, int>(opt_names.at(2), atoi(opt_inputs.at(2))),
@@ -250,27 +251,25 @@ namespace restfulEz {
             case SUMMONER: // Summoner
                 switch (endpoint_method) {
                     case S_BY_RSO_PUUID:
-                        response = this->_underlying_client->Summoner.by_rso_puuid(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Summoner.by_rso_puuid(params.at(0), params.at(1)); break;
                     case S_BY_ACCOUNT_ID:
-                        response = this->_underlying_client->Summoner.by_account_id(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Summoner.by_account_id(params.at(0), params.at(1)); break;
                     case S_BY_NAME:
-                        response = this->_underlying_client->Summoner.by_name(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Summoner.by_name(params.at(0), params.at(1)); break;
                     case S_BY_PUUID:
-                        response = this->_underlying_client->Summoner.by_puuid(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Summoner.by_puuid(params.at(0), params.at(1)); break;
                     case S_BY_SUMMONER_ID:
-                        response = this->_underlying_client->Summoner.by_summoner_id(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Summoner.by_summoner_id(params.at(0), params.at(1)); break;
                 }break;
             case SPECTATOR: // Spectator
                 switch (endpoint_method) {
                     case SP_BY_SUMMONER_ID:
-                        response = this->_underlying_client->Spectator.by_summoner_id(params.at(0), params.at(1)); break;
+                        task.response = this->underlying_client->Spectator.by_summoner_id(params.at(0), params.at(1)); break;
                     case SP_FEATURED:
-                        response = this->_underlying_client->Spectator.featured_games(params.at(0)); break;
+                        task.response = this->underlying_client->Spectator.featured_games(params.at(0)); break;
                 }break;
             default: // Catch Exception
                 throw std::invalid_argument("Invalid Endpoint");
         };
-        return response;
     }
-
 }
