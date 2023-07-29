@@ -14,7 +14,7 @@ namespace restfulEz {
                         return this->stop_execution || !this->simple_requests.empty() || !this->linked_requests.empty();
                         });
 
-                if (this->stop && ( this->simple_requests.empty() || this->linked_requests.empty()) {
+                if (this->stop_execution && ( this->simple_requests.empty() || this->linked_requests.empty())) {
                     return;
                 }
 

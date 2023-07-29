@@ -1,5 +1,8 @@
 #include "QueryForm.h"
+#include "RestfulEzreal.h"
 #include "imgui.h"
+#include "imgui_internal.h"
+#include <string_view>
 
 
 #define INPUT_TEXT_FRAC 2/3
@@ -32,11 +35,15 @@ namespace restfulEz {
 
         if (this->_accepts_optional) {this->_n_used_optional_p1 = 1;}
 
-        this->_req_in_form = { game_ind, endpoint_ind, endpoint_method_ind };
+        this->_game_ind = game_ind;
+        this->_endpoint_ind = endpoint_ind;
+        this->_endpoint_method_ind = endpoint_method_ind;
     };
 
     // Render Endpoint Submission Forms
     void QUERY_FORM::render_form() {
+        
+        // setup style
         float height_l = ImGui::GetFrameHeightWithSpacing();
         ImGui::BeginChild(this->_ID.data(), ImVec2(ImGui::GetContentRegionAvail().x, (height_l * (this->_n_params + this->_n_used_optional_p1 + 2) + 3 * ImGui::GetStyle().ItemSpacing.y)), true, ImGuiWindowFlags_ChildWindow);
         ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
@@ -46,18 +53,10 @@ namespace restfulEz {
             this->remove_form = true;
         };
 
-        if (!this->form_execute) { this->render_input_fields();}
+        this->render_required(this->form_execute);
 
-        else {
-            ImVec4 disabled_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, disabled_color);
-            for (int i = 0; i < this->_n_params; i++) {
-                ImGui::InputText(this->_param_names[i], this->_params_in_form[i], 256, ImGuiInputTextFlags_ReadOnly);
-            }
-            if (this->_accepts_optional) {
-                this->render_optionals(true);
-            }
-            ImGui::PopStyleColor();
+        if (this->_accepts_optional) {
+            this->render_optionals(this->form_execute);
         }
 
         if (!this->form_execute) {
@@ -67,50 +66,37 @@ namespace restfulEz {
                     empty |= strlen(this->_params_in_form[i].param) == 0;
                 }
                 if (!empty) {
-                    for (int i = 0; i < this->_n_params; i++) { // add inputs into the request structure
-                        this->_req_in_form.params.push_back(this->_params_in_form[i]);
-                    }
-                    if (this->_accepts_optional) { // add optional inputs into the request structure
-                        for (int i = 0; i < this->_optional_names.size(); i++) {
-                            if (this->_optionals_to_send[i]) { // check which inputs to send
-                                this->_req_in_form.optional_names.push_back(this->_optional_names[i]);
-                                this->_req_in_form.optional_inputs.push_back(this->_optional_inputs[i]);
-                            } else {
-                                this->_req_in_form.optional_names.push_back(""); // giving empty string makes the underlying client not send the request
-                                this->_req_in_form.optional_inputs.push_back("0");
-                            }
-                        }
-                    }
-                    *this->_execute = true;
-                    this->form_execute = true;
-                    *this->_client_req = this;
+                    this->submit_request();
                 }
                 if (this->_accepts_optional) {
                     this->render_optionals(false);
                 }
             }
         }
-        else {
-            if (this->request_result.size() != 0) {
-                ImGui::Text(this->request_result.data());
-            }
-        }
         ImGui::EndChild();
     };	
 
-    void QUERY_FORM::render_input_fields() {
+    void QUERY_FORM::render_singular_field(const int i, bool already_sent) {
+        ImGui::InputText(this->_param_names[i], this->_params_in_form[i], 256, already_sent ? ImGuiInputTextFlags_None : this->_type_ordering[i]);
+    }
+
+    void QUERY_FORM::render_required(bool already_sent) {
+        if (already_sent) {
+            ImVec4 disabled_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
+            ImGui::PushStyleColor(ImGuiCol_Text, disabled_color);
+        }
 
         static float text_width = ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC;
         ImGui::PushItemWidth(text_width);
 
         for (int i = 0; i < this->_n_params; i++) {
-
-            ImGui::InputText(this->_param_names[i], this->_params_in_form[i], 256, this->_type_ordering[i]);
+            this->render_singular_field(i, already_sent);
         }
+
         ImGui::PopItemWidth();
 
-        if (this->_accepts_optional) {
-            this->render_optionals(false);
+        if (already_sent) {
+            ImGui::PopStyleColor();
         }
     }
 
@@ -130,7 +116,6 @@ namespace restfulEz {
             return next_focus;
         } 
         return -1;
-
     }
 
     void QUERY_FORM::render_optionals(bool already_sent) {
@@ -218,4 +203,111 @@ namespace restfulEz {
 
     }
 
+    void QUERY_FORM::submit_request() {
+        request new_task{this->_game_ind, this->_endpoint_ind, this->_endpoint_method_ind};
+        for (int i = 0; i < this->_n_params; i++) { // add inputs into the request structure
+            new_task.params.push_back(this->_params_in_form[i]);
+        }
+        if (this->_accepts_optional) { // add optional inputs into the request structure
+            for (int i = 0; i < this->_optional_names.size(); i++) {
+                if (this->_optionals_to_send[i]) { // check which inputs to send
+                    new_task.optional_names.push_back(this->_optional_names[i]);
+                    new_task.optional_inputs.push_back(this->_optional_inputs[i]);
+                } else {
+                    new_task.optional_names.push_back(""); // giving empty string makes the underlying client not send the request
+                    new_task.optional_inputs.push_back("0");
+                }
+            }
+        }
+        this->sender->add_request(new_task);
+        this->form_execute = true;
+    }
+
+
+    static inline void render_noniterative_form(param_dependence_info& link_description) {
+        static char _id[] = "##01";
+        _id[2] = link_description.param_index;
+        int counter = 0;
+        ImGui::Text("Json Index Keys");
+        for (auto& key : link_description.json_keys) {
+            _id[3] = counter;
+            ImGui::InputText(_id, key.data(), ImGuiInputTextFlags_None);
+           ++counter;
+        }
+
+        // add key button
+        static char _add_id[] = "Add Key##0";
+        _add_id[9] = link_description.param_index;
+        if (ImGui::Button(_add_id)) {
+            link_description.json_keys.push_back("");
+        }
+
+        // remove key button
+        static char _rem_id[] = "Remove Key##0";
+        _rem_id[12] = link_description.param_index;
+        if (link_description.json_keys.size() != 0) {
+            if (ImGui::Button(_rem_id)) {
+                link_description.json_keys.pop_back();
+            }
+        }
+    }
+
+    static inline void render_iterative_form(param_dependence_info& link_description, PARAM_CONT& iter_index, PARAM_CONT& iter_limit) {
+        // ImGui Ids to avoid conflicts
+        static char _ind_id[] = "Json Array Index##0";
+        static char _lim_id[] = "Iteration Limit##0";
+        // change id to avoid conflicts
+        _ind_id[18] = link_description.param_index;
+        _ind_id[17] = link_description.param_index;
+        // display input text fields
+        ImGui::InputText(_ind_id, iter_index.param, ImGuiInputTextFlags_CharsDecimal);
+        ImGui::InputText(_lim_id, iter_limit.param, ImGuiInputTextFlags_CharsDecimal);
+        // display input fields for the json keys
+        render_noniterative_form(link_description);
+    }
+
+    void LinkedForm::render_linked_fields(const int i) {
+
+        static char itera[] = "Iterative##1";
+        itera[11] = i;
+        ImGui::SameLine();
+        ImGui::Checkbox(itera, &this->link_descriptions[i].iterative);
+
+        if (this->link_descriptions[i].iterative) {
+            render_iterative_form(this->link_descriptions[i], this->iter_index, this->iter_limit); 
+        } else {
+            render_noniterative_form(this->link_descriptions[i]);
+        }
+    }
+
+    void LinkedForm::render_required(bool already_sent) {
+        if (already_sent) {
+            ImVec4 disabled_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
+            ImGui::PushStyleColor(ImGuiCol_Text, disabled_color);
+        }
+        static float text_width = ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC;
+        ImGui::PushItemWidth(text_width);
+        static char check_link[] = "Link##1";
+
+        for (int i = 0; i < this->get_n_params(); i++) {
+            check_link[6] = i;
+            ImGui::Checkbox(check_link, &this->inputs_from_parents[i]);
+            if (!this->inputs_from_parents[i]) {
+                this->render_singular_field(i, already_sent);
+            } else {
+                this->render_linked_fields(i);
+            }
+        }
+        ImGui::PopItemWidth();
+        if (already_sent) {
+            ImGui::PopStyleColor();
+        }
+    }
+
+    void FormGroup::render_group(RestfulEzreal& owner) {
+        for (auto& linked_form : this->forms) {
+            linked_form.render_form();
+        }
+        owner.NewFormButton();
+    }
 }

@@ -40,6 +40,9 @@ namespace restfulEz {
             RequestSender();
             ~RequestSender();
 
+            void add_request(request task) {this->simple_requests.push(task);};
+            void add_batch_request(std::shared_ptr<Batch_Request> batch_task) {this->linked_requests.push(batch_task);};
+
         private: // methods
             void worker();
             void write_response_file(const request& task);
