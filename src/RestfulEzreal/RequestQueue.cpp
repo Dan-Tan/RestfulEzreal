@@ -3,9 +3,26 @@
 
 namespace restfulEz {
 
+    RequestSender::RequestSender() {
+        this->worker_thread = std::thread([this] {this->worker();});
+    }
+
+    RequestSender::~RequestSender() {
+
+        {
+            std::unique_lock<std::mutex> lock(this->queue_mutex);
+            this->stop_execution = true;
+        }
+
+        condition.notify_all();
+        this->worker_thread.join();
+    }
+
     void RequestSender::worker() {
         while (true) {
             request task;
+            std::shared_ptr<Batch_Request> b_task;
+            bool iterative = false;
 
             {
                 std::unique_lock<std::mutex> lock(this->queue_mutex);
@@ -21,14 +38,20 @@ namespace restfulEz {
                 if (!this->simple_requests.empty()) {
                     task = std::move(this->simple_requests.front());
                     this->simple_requests.pop();
+                    iterative = false;
                 } else if (!this->linked_requests.empty()) {
-                    task = std::move(this->simple_requests.front());
+                    b_task = std::move(this->linked_requests.front());
                     this->linked_requests.pop();
+                    iterative = true;
                 } else {
                     throw std::logic_error("Request thread continued with no tasks");
                 }
             };
-            this->Send_Request(task);
+            if (iterative) {
+                this->Send_Batch_Request(b_task);
+            } else {
+                this->Send_Request(task);
+            }
         }
     }
 
@@ -80,7 +103,7 @@ namespace restfulEz {
         std::ofstream output;
 
         output.open(file_output);
-        output << Json::writeString(builder, response);
+        output << response;
         output.close();
 
         counter++;

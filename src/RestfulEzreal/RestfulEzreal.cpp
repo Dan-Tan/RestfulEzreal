@@ -146,7 +146,9 @@ namespace restfulEz {
             this->batch_group->add_form(new_form);
         } else {
             this->_current_forms.push_back(new_form);
+            this->_current_forms.back().set_id(this->_next_form_id);
             this->_current_forms.back().set_sender(request_sender);
+            this->_next_form_id += 1;
         }
     }
 
@@ -174,6 +176,7 @@ namespace restfulEz {
 
             this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, config["log-path"].asString(), report_level, config["verbosity"].asBool());
             config_file.open(CONFIG_FILE_PATH);
+            this->request_sender->set_client(this->_underlying_client);
             return;
         }
         ImGui::OpenPopup("Configure Client");
@@ -235,6 +238,7 @@ namespace restfulEz {
                 config_file << Json::writeString(builder, config);
                 config_file.close();
                 this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
+                this->request_sender->set_client(this->_underlying_client);
                 this->_path_to_output = path_to_output;
                 ImGui::CloseCurrentPopup();
             }

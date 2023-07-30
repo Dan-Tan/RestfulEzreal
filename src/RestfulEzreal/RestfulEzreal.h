@@ -2,6 +2,7 @@
 #include "client/client.h"
 #include "json/json.h"
 #include "Walnut/Application.h"
+#include "RequestQueue.h"
 #include "QueryForm.h"
 #include <fstream>
 #include <vector>
@@ -39,10 +40,13 @@ namespace restfulEz {
 
             std::shared_ptr<FormGroup> batch_group = nullptr;
 
+            int _next_form_id = 1;
+
         public:
             RestfulEzreal(current_page* on_display) {
                 this->_on_display = on_display;
                 this->batch_group = std::make_shared<FormGroup>();
+                this->request_sender = std::make_shared<RequestSender>();
             };
 
             void OnUIRender() override;

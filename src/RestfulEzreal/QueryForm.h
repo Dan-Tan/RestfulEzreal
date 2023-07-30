@@ -48,6 +48,9 @@ namespace restfulEz {
             ~QUERY_FORM() = default;
 
             void set_sender(std::shared_ptr<RequestSender> sender_client) {this->sender = sender_client;}
+            void set_id(int new_id) {
+                this->_ID = std::string("##FORM") + std::to_string(new_id);
+            }
             virtual void render_form();
             bool check_remove() { return this->remove_form; };
             std::size_t get_n_params() {return this->_n_params;};

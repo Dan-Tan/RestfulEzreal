@@ -31,7 +31,7 @@ namespace restfulEz {
             std::shared_ptr<client::RiotApiClient> underlying_client = nullptr;
 
             // Simple requests that do not provide nor have dependecies
-            std::queue<request> simple_requests; 
+            std::queue<request> simple_requests = {}; 
 
             // Requests with a chain of dependecies
             std::queue<std::shared_ptr<Batch_Request>> linked_requests; 
@@ -40,7 +40,15 @@ namespace restfulEz {
             RequestSender();
             ~RequestSender();
 
-            void add_request(request task) {this->simple_requests.push(task);};
+            void set_client(std::shared_ptr<client::RiotApiClient> client) {this->underlying_client = client;};
+
+            void add_request(request task) {
+                {
+                    std::unique_lock<std::mutex> lock(queue_mutex);
+                    this->simple_requests.push(task);
+                }
+                condition.notify_one();
+            };
             void add_batch_request(std::shared_ptr<Batch_Request> batch_task) {this->linked_requests.push(batch_task);};
 
         private: // methods

@@ -68,9 +68,6 @@ namespace restfulEz {
                 if (!empty) {
                     this->submit_request();
                 }
-                if (this->_accepts_optional) {
-                    this->render_optionals(false);
-                }
             }
         }
         ImGui::EndChild();
