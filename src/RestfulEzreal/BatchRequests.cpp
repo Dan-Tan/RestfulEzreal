@@ -13,9 +13,8 @@ namespace restfulEz {
         Json::Value& iterative_json = response;
         try {
             int iter_count = 0;
-            for (const std::string& ind_key : dep.json_keys) {
-
-                iterative_json = iterative_json[ind_key];
+            for (const PARAM_CONT& ind_key : dep.json_keys) {
+                iterative_json = iterative_json[ind_key.param];
                 if (iter_count == dep.iter_index - 1) {
                     break;
                 }
@@ -31,7 +30,7 @@ namespace restfulEz {
             for (auto& json_lst_item : iterative_json) {
                 temp_json = json_lst_item;
                 for (int i = dep.iter_index; i < dep.json_keys.size(); i++) {
-                    temp_json = temp_json[dep.json_keys.at(i)];
+                    temp_json = temp_json[dep.json_keys.at(i).param];
                 }
                 from_parent.push_back(temp_json.asCString());
             }
@@ -49,8 +48,8 @@ namespace restfulEz {
         }
         try {
             Json::Value& resp = response;
-            for (const std::string& j_key : dep.json_keys) {
-                resp = resp[j_key];
+            for (const PARAM_CONT& j_key : dep.json_keys) {
+                resp = resp[j_key.param];
             }
 
             req->params[dep.param_index] = resp.asCString();

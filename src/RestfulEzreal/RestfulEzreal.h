@@ -85,6 +85,7 @@ namespace restfulEz {
 
         private:
             std::vector<LinkedForm> forms;
+            int next_id = 1;
 
         public:
             FormGroup() = default;
@@ -93,6 +94,8 @@ namespace restfulEz {
             void render_group(RestfulEzreal& owner);
             void add_form(QUERY_FORM& form) {
                 forms.push_back({form}); // trigger constructor
+                forms.back().set_id(this->next_id);
+                this->next_id += 1;
             }
     };
 }

@@ -44,8 +44,8 @@ namespace restfulEz {
     void QUERY_FORM::render_form() {
         
         // setup style
-        float height_l = ImGui::GetFrameHeightWithSpacing();
-        ImGui::BeginChild(this->_ID.data(), ImVec2(ImGui::GetContentRegionAvail().x, (height_l * (this->_n_params + this->_n_used_optional_p1 + 2) + 3 * ImGui::GetStyle().ItemSpacing.y)), true, ImGuiWindowFlags_ChildWindow);
+        static float height_l = ImGui::GetStyle().ItemSpacing.y;
+        ImGui::BeginChild(this->_ID.data(), ImVec2(ImGui::GetContentRegionAvail().x, this->form_height + 2 * height_l), true, ImGuiWindowFlags_ChildWindow);
         ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("My Button").x);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
@@ -69,6 +69,10 @@ namespace restfulEz {
                     this->submit_request();
                 }
             }
+        }
+        this->form_height = ImGui::GetCursorPosY();
+        if (this->recalculate_height) {
+            this->recalculate_height = false;
         }
         ImGui::EndChild();
     };	
@@ -152,6 +156,7 @@ namespace restfulEz {
                 this->_optionals_to_send[i] = 0;
                 this->_n_used_optional_p1 -= 1;
                 opt_index = i;
+                this->recalculate_height = true;
             };
         }
 
@@ -195,6 +200,7 @@ namespace restfulEz {
             if (this->_optionals_to_send[opt_index] == 0) {this->_n_used_optional_p1 += 1;};
             this->_optionals_to_send[opt_index] = 1;
             opt_index = find_next_focus(this->_optionals_to_send);
+            this->recalculate_height = true;
         }
 
     }
@@ -222,14 +228,15 @@ namespace restfulEz {
 
     static inline void render_noniterative_form(param_dependence_info& link_description) {
         static char _id[] = "##01";
-        _id[2] = link_description.param_index;
-        int counter = 0;
+        _id[2] = (char) link_description.param_index + '0';
+        static int counter = 0;
         ImGui::Text("Json Index Keys");
-        for (auto& key : link_description.json_keys) {
-            _id[3] = counter;
-            ImGui::InputText(_id, key.data(), ImGuiInputTextFlags_None);
-           ++counter;
+        for (int i = 0; i < link_description.json_keys.size(); i++) {
+            _id[3] = (char)counter + '0';
+            ImGui::InputText(_id, link_description.json_keys[i], 256, ImGuiInputTextFlags_None);
+            counter += 1;
         }
+        counter = 0;
 
         // add key button
         static char _add_id[] = "Add Key##0";
@@ -256,8 +263,8 @@ namespace restfulEz {
         _ind_id[18] = link_description.param_index;
         _ind_id[17] = link_description.param_index;
         // display input text fields
-        ImGui::InputText(_ind_id, iter_index.param, ImGuiInputTextFlags_CharsDecimal);
-        ImGui::InputText(_lim_id, iter_limit.param, ImGuiInputTextFlags_CharsDecimal);
+        ImGui::InputText(_ind_id, iter_index.param, 256, ImGuiInputTextFlags_CharsDecimal);
+        ImGui::InputText(_lim_id, iter_limit.param, 256, ImGuiInputTextFlags_CharsDecimal);
         // display input fields for the json keys
         render_noniterative_form(link_description);
     }
@@ -265,8 +272,9 @@ namespace restfulEz {
     void LinkedForm::render_linked_fields(const int i) {
 
         static char itera[] = "Iterative##1";
-        itera[11] = i;
+        itera[11] = (char) i + '0';
         ImGui::SameLine();
+
         ImGui::Checkbox(itera, &this->link_descriptions[i].iterative);
 
         if (this->link_descriptions[i].iterative) {
@@ -301,6 +309,19 @@ namespace restfulEz {
     }
 
     void FormGroup::render_group(RestfulEzreal& owner) {
+
+        int counter = 0;
+        int to_remove = -1;
+        for (LinkedForm& form : this->forms) {
+            if (form.check_remove()) {
+                to_remove = counter;
+            }
+            counter += 1;
+        }
+        if (to_remove != -1) {
+            this->forms.erase(this->forms.begin() + to_remove);
+        }
+
         for (auto& linked_form : this->forms) {
             linked_form.render_form();
         }

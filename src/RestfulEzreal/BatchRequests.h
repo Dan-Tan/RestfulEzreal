@@ -44,7 +44,7 @@ namespace restfulEz {
         // does this link describe an iterative dependence
         bool iterative = false;
         // describes how to obtain the parameter from the Json object
-        std::vector<std::string> json_keys;
+        std::vector<PARAM_CONT> json_keys;
         // describes where to insert the obtained parameter
         std::size_t param_index;
         // describes which json keys precede the array to iterate over and json keys after the iterator

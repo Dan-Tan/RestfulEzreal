@@ -36,6 +36,8 @@ namespace restfulEz {
             
             bool form_execute = false;
             bool remove_form = false;
+            
+            float form_height = 0.0f;
 
         public:
             QUERY_FORM(const QUERY_FORM& copy) {*this = copy;};
@@ -54,9 +56,11 @@ namespace restfulEz {
             virtual void render_form();
             bool check_remove() { return this->remove_form; };
             std::size_t get_n_params() {return this->_n_params;};
+            void calc_height() {this->recalculate_height = true;}
 
         protected:
             void render_singular_field(const int i, bool already_sent);
+            bool recalculate_height = true;
 
         private:
             virtual void render_required(bool already_sent);
@@ -77,8 +81,8 @@ namespace restfulEz {
 
         public:
             LinkedForm(const QUERY_FORM& copy) : QUERY_FORM(copy) {
-                for (int i = 0; i < this->get_n_params(); i++) {
-                    this->link_descriptions.emplace_back(false, std::vector<std::string>(), 0, 0, i);
+                for (std::size_t i = 0; i < this->get_n_params(); i++) {
+                    this->link_descriptions.push_back({false, std::vector<PARAM_CONT>(), i, 0, 0});
                 }
             };
             ~LinkedForm() = default;
