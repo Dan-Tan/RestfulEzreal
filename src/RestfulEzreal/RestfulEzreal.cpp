@@ -176,7 +176,7 @@ namespace restfulEz {
 
             this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, config["log-path"].asString(), report_level, config["verbosity"].asBool());
             config_file.open(CONFIG_FILE_PATH);
-            this->request_sender->set_client(this->_underlying_client);
+            this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
             return;
         }
         ImGui::OpenPopup("Configure Client");
@@ -238,7 +238,7 @@ namespace restfulEz {
                 config_file << Json::writeString(builder, config);
                 config_file.close();
                 this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
-                this->request_sender->set_client(this->_underlying_client);
+                this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
                 this->_path_to_output = path_to_output;
                 ImGui::CloseCurrentPopup();
             }

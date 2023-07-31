@@ -37,7 +37,7 @@ namespace restfulEz {
             std::queue<std::shared_ptr<Batch_Request>> linked_requests; 
 
         public:
-            RequestSender();
+            RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_directory);
             ~RequestSender();
 
             void set_client(std::shared_ptr<client::RiotApiClient> client) {this->underlying_client = client;};

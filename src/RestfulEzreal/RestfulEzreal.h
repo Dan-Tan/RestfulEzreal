@@ -46,7 +46,6 @@ namespace restfulEz {
             RestfulEzreal(current_page* on_display) {
                 this->_on_display = on_display;
                 this->batch_group = std::make_shared<FormGroup>();
-                this->request_sender = std::make_shared<RequestSender>();
             };
 
             void OnUIRender() override;

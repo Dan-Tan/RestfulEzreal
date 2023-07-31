@@ -124,44 +124,43 @@ namespace restfulEz {
         static char id[5] = "x## ";
         static int opt_index = 0;
         static float text_width = ImGui::GetContentRegionAvail().x * OPT_INPUT_TEXT_FRAC;
-
+        
+        // change style for when the request has already been executed
         if (already_sent) {
-
             ImVec4 disabled_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
             ImGui::PushStyleColor(ImGuiCol_Text, disabled_color);
-            ImGui::PushItemWidth(text_width);
-
-            for (int i = 0; i < this->_optionals_to_send.size(); i++) {
-                if (this->_optionals_to_send[i] == 1) {
-                    ImGui::InputText(this->_optional_names[i], this->_optional_inputs[i], 256, ImGuiInputTextFlags_ReadOnly);
-                }
-            }
-            ImGui::PopItemWidth();
-            ImGui::PopStyleColor();
-
-        } else {
-            for (int i = 0; i < this->_optionals_to_send.size(); i++) {
-                if (this->_optionals_to_send[i]) {
-
-
-                    // display input field
-                    ImGui::PushItemWidth(text_width);
-                    ImGui::InputText(this->_optional_names[i], this->_optional_inputs[i], 256, this->_optional_types[i]);
-                    ImGui::PopItemWidth();
-                    
-                    // display delete button
-                    ImGui::SameLine(ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC - 2 * ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("x").x);
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
-                    id[3] = i;
-
-                    if (ImGui::Button(id)) {
-                        this->_optionals_to_send[i] = 0;
-                        this->_n_used_optional_p1 -= 1;
-                        opt_index = i;
-                    };
-                }
-            }
         }
+        ImGui::PushItemWidth(text_width);
+
+        // render input forms
+        for (int i = 0; i < this->_optionals_to_send.size(); i++) {
+            if (this->_optionals_to_send[i] != 1) {
+                continue;
+            }
+            ImGui::InputText(this->_optional_names[i], this->_optional_inputs[i], 256, already_sent ? ImGuiInputTextFlags_ReadOnly : this->_optional_types[i]);
+
+            // display delete button
+            if (already_sent) {
+                continue;
+            }
+
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC - 2 * ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("x").x);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
+            id[3] = i;
+        
+            if (ImGui::Button(id)) {
+                this->_optionals_to_send[i] = 0;
+                this->_n_used_optional_p1 -= 1;
+                opt_index = i;
+            };
+        }
+
+        // remove style if already executed
+        if (already_sent) {
+            ImGui::PopStyleColor();
+        }
+        ImGui::PopItemWidth();
+
         float drop_down_width = (0.3f * ImGui::GetContentRegionAvail().x);
         ImGui::SetNextItemWidth(drop_down_width);
         if (opt_index == -1) {
