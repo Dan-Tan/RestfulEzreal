@@ -84,8 +84,13 @@ namespace restfulEz {
     class FormGroup {
 
         private:
-            std::vector<LinkedForm> forms;
+            // shared_ptr easier to pass between parent child nodes
+            std::vector<std::shared_ptr<LinkedForm>> forms;
             int next_id = 1;
+
+            bool link_mode = false;
+            std::shared_ptr<LinkedForm> parent = nullptr;
+            std::shared_ptr<LinkedForm> child = nullptr;
 
         public:
             FormGroup() = default;
@@ -93,8 +98,8 @@ namespace restfulEz {
 
             void render_group(RestfulEzreal& owner);
             void add_form(QUERY_FORM& form) {
-                forms.push_back({form}); // trigger constructor
-                forms.back().set_id(this->next_id);
+                forms.push_back(std::make_shared<LinkedForm>(form)); // trigger constructor
+                forms.back()->set_id(this->next_id);
                 this->next_id += 1;
             }
     };

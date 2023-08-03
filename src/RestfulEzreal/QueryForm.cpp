@@ -11,6 +11,10 @@
 
 namespace restfulEz {
 
+    bool QUERY_FORM::operator==(const QUERY_FORM& other_form) {
+        return this->_ID == other_form._ID;
+    }
+
     QUERY_FORM::QUERY_FORM(const std::size_t n_params, const int game_ind, const int endpoint_ind, const int endpoint_method_ind, const char* game_name, 
             const char* endpoint, const char* endpoint_method, 
             std::vector<P_NAME> param_names, std::vector<ImGuiInputTextFlags> type_ordering,
@@ -40,13 +44,17 @@ namespace restfulEz {
         this->_endpoint_method_ind = endpoint_method_ind;
     };
 
+    void QUERY_FORM::render_title() {
+        ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
+    }
+
     // Render Endpoint Submission Forms
     void QUERY_FORM::render_form() {
         
         // setup style
         static float height_l = ImGui::GetStyle().ItemSpacing.y;
         ImGui::BeginChild(this->_ID.data(), ImVec2(ImGui::GetContentRegionAvail().x, this->form_height + 2 * height_l), true, ImGuiWindowFlags_ChildWindow);
-        ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
+        this->render_title();
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("My Button").x);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 20);
         if (ImGui::Button("Close")) {
@@ -226,7 +234,14 @@ namespace restfulEz {
     }
 
 
-    static inline void render_noniterative_form(param_dependence_info& link_description) {
+    static inline void render_noniterative_form(param_dependence_info& link_description, std::size_t* next_index) {
+
+        static char _par_id[] = "Select Parent##0";
+        _par_id[15] = link_description.param_index;
+
+        if (ImGui::Button(_par_id)) {
+            *next_index = link_description.param_index;             // write in child form
+        }
         static char _id[] = "##01";
         _id[2] = (char) link_description.param_index + '0';
         static int counter = 0;
@@ -255,7 +270,7 @@ namespace restfulEz {
         }
     }
 
-    static inline void render_iterative_form(param_dependence_info& link_description, PARAM_CONT& iter_index, PARAM_CONT& iter_limit) {
+    static inline void render_iterative_form(param_dependence_info& link_description, PARAM_CONT& iter_index, PARAM_CONT& iter_limit, std::size_t* next_ind) {
         // ImGui Ids to avoid conflicts
         static char _ind_id[] = "Json Array Index##0";
         static char _lim_id[] = "Iteration Limit##0";
@@ -266,7 +281,7 @@ namespace restfulEz {
         ImGui::InputText(_ind_id, iter_index.param, 256, ImGuiInputTextFlags_CharsDecimal);
         ImGui::InputText(_lim_id, iter_limit.param, 256, ImGuiInputTextFlags_CharsDecimal);
         // display input fields for the json keys
-        render_noniterative_form(link_description);
+        render_noniterative_form(link_description, next_ind);
     }
 
     void LinkedForm::render_linked_fields(const int i) {
@@ -278,9 +293,9 @@ namespace restfulEz {
         ImGui::Checkbox(itera, &this->link_descriptions[i].iterative);
 
         if (this->link_descriptions[i].iterative) {
-            render_iterative_form(this->link_descriptions[i], this->iter_index, this->iter_limit); 
+            render_iterative_form(this->link_descriptions[i], this->iter_index[i], this->iter_limit[i], &this->next_index); 
         } else {
-            render_noniterative_form(this->link_descriptions[i]);
+            render_noniterative_form(this->link_descriptions[i], &this->next_index);
         }
     }
 
@@ -308,12 +323,88 @@ namespace restfulEz {
         }
     }
 
+    bool LinkedForm::render_form_return() {
+        this->render_form();
+
+        return this->next_index != -1;
+    }
+
+    bool LinkedForm::render_link_mode() {
+        static float height_l = ImGui::GetStyle().ItemSpacing.y;
+        ImGui::BeginChild(this->get_ID().data(), ImVec2(ImGui::GetContentRegionAvail().x, this->form_height + 2 * height_l), true, ImGuiWindowFlags_ChildWindow);
+        this->render_title();
+        if (this->next_index != -1) {
+            ImGui::Text("Currently Selecting Parent...");
+        } 
+        else if (ImGui::Button("Select as Parent")) {
+            ImGui::EndChild();
+            return true;
+        }
+        ImGui::EndChild();
+        return false;
+    }
+
+    void LinkedForm::complete_link(std::shared_ptr<LinkedForm> next_parent) {
+        if (this->next_index == -1) {
+            throw std::logic_error("parent added before index recorded");
+        }
+        this->parents[this->next_index] = next_parent;
+        this->next_index = -1;
+    }
+
+    void LinkedForm::cancel_link() {
+        this->next_index = -1;
+    }
+
+    void LinkedForm::insert_child(std::shared_ptr<LinkedForm> child) {
+        this->children.push_back(child);
+    }
+
+    void LinkedForm::remove_parent(const LinkedForm& parent) {
+
+        for (std::shared_ptr<LinkedForm>& form_ptr : this->parents) {
+            if (form_ptr != nullptr && *form_ptr == parent) {
+                form_ptr = nullptr;
+            }
+        }
+    }
+
+    void LinkedForm::remove_child(const LinkedForm& child) {
+
+        std::vector<int> to_remove;
+
+        for (int i = 0; i < this->children.size(); i++) {
+            if (*this->children[i] == child) {
+                to_remove.push_back(i);
+            }
+        }
+        int counter = 0;
+        for (auto& ind : to_remove) {
+            this->children.erase(this->children.begin() + ind - counter);
+            counter++;
+        }
+    }
+
+    static inline void delete_form(const std::shared_ptr<LinkedForm> to_remove) {
+
+        for (std::shared_ptr<LinkedForm>& child_ptr : to_remove->get_children()) {
+            child_ptr->remove_parent(*to_remove);
+        }
+
+        for (std::shared_ptr<LinkedForm>& parent_ptr : to_remove->get_parents()) {
+            if (parent_ptr) { // parent_ptr can be nullptr
+                parent_ptr->remove_child(*parent_ptr);
+            }
+        }
+    }
+
     void FormGroup::render_group(RestfulEzreal& owner) {
 
         int counter = 0;
         int to_remove = -1;
-        for (LinkedForm& form : this->forms) {
-            if (form.check_remove()) {
+        for (std::shared_ptr<LinkedForm>& form : this->forms) {
+            if (form->check_remove()) {
+                delete_form(form);
                 to_remove = counter;
             }
             counter += 1;
@@ -321,9 +412,23 @@ namespace restfulEz {
         if (to_remove != -1) {
             this->forms.erase(this->forms.begin() + to_remove);
         }
-
-        for (auto& linked_form : this->forms) {
-            linked_form.render_form();
+        
+        if (this->link_mode) {
+            for (auto& linked_form : this->forms) {
+                if (linked_form->render_link_mode()) {
+                    this->parent = linked_form;
+                    this->child->complete_link(linked_form);
+                    this->parent->insert_child(this->child);
+                    this->link_mode = false;
+                }
+            }
+        } else {
+            for (auto& linked_form : this->forms) {
+                if (linked_form->render_form_return()) {
+                    this->child = linked_form;
+                    this->link_mode = true;
+                }
+            }
         }
         owner.NewFormButton();
     }
