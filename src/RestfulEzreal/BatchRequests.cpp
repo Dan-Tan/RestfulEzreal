@@ -95,6 +95,12 @@ namespace restfulEz {
         }
     }
 
+    Linked_Request::Linked_Request(const request& base, const std::vector<std::size_t>& required_params) : required_dependencies(required_params), request(base) {
+        for (int i; i < required_params.size(); i++) {
+            this->completed_dependencies.push_back(0);
+        }
+    }
+
     void insert_request(std::shared_ptr<Batch_Request> current_node, std::shared_ptr<Linked_Request> child_node) {
         std::shared_ptr<Batch_Request> previous_node = current_node->previous;
         std::shared_ptr<Batch_Request> new_node = std::make_shared<Batch_Request>(nullptr, child_node, nullptr); 

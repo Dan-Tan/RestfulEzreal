@@ -38,6 +38,9 @@ namespace restfulEz {
         std::vector<PARAM_CONT> optional_inputs;
 
         Json::Value response;
+        
+        request() {};
+        request(const request& copy) {*this = copy;};
     }request;
 
     typedef struct param_dependence_info {
@@ -65,6 +68,7 @@ namespace restfulEz {
     typedef struct Linked_Request : public request {
 
         Linked_Request(const std::vector<std::size_t>& required_params);
+        Linked_Request(const request& base, const std::vector<std::size_t>& required_params);
         ~Linked_Request() = default;
         
         std::vector<request_link> child_links;
@@ -79,6 +83,7 @@ namespace restfulEz {
     typedef struct Iterative_Request : public Linked_Request {
 
         Iterative_Request(const std::vector<std::size_t>& required_params) : Linked_Request(required_params) {};
+        Iterative_Request(const request& base, const std::vector<std::size_t>& required_params) : Linked_Request(base, required_params) {};
         ~Iterative_Request() = default;
         // vector of params to write into the request sub class (avoid having multiple requests objects)
         std::vector<std::vector<PARAM_CONT>> params_from_parent;

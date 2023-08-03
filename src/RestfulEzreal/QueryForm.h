@@ -36,7 +36,6 @@ namespace restfulEz {
             
             bool form_execute = false;
             bool remove_form = false;
-            
 
         public:
             QUERY_FORM(const QUERY_FORM& copy) {*this = copy;};
@@ -63,6 +62,7 @@ namespace restfulEz {
         protected:
             void render_title();
             void render_singular_field(const int i, bool already_sent);
+            request construct_request();
             const std::string& get_ID() {return this->_ID;};
             bool recalculate_height = true;
             float form_height = 0.0f;
@@ -86,6 +86,8 @@ namespace restfulEz {
             
             std::size_t next_index = -1;
 
+            std::shared_ptr<Linked_Request> final_request = nullptr;
+
         public:
             LinkedForm(const QUERY_FORM& copy) : QUERY_FORM(copy) {
                 for (std::size_t i = 0; i < this->get_n_params(); i++) {
@@ -99,14 +101,22 @@ namespace restfulEz {
             bool render_form_return();
             bool render_link_mode();
 
+            void construct_request_heap();
+
             void complete_link(std::shared_ptr<LinkedForm> next_parent);
             void cancel_link(); // resets next_index
             
             void insert_child(std::shared_ptr<LinkedForm> child);
-            std::vector<std::shared_ptr<LinkedForm>> get_children() const {return this->children;}; // for FormGroup to notify paqrent of removed children
-            std::vector<std::shared_ptr<LinkedForm>> get_parents() const {return this->parents;}; // for FormGroup to notify paqrent of removed children
             void remove_parent(const LinkedForm& parent);
             void remove_child(const LinkedForm& child);
+
+            std::shared_ptr<Linked_Request> get_final_request() {return this->final_request;};
+            std::vector<std::shared_ptr<LinkedForm>> get_children() const {return this->children;}; // for FormGroup to notify paqrent of removed children
+            std::vector<std::shared_ptr<LinkedForm>> get_parents() const {return this->parents;}; // for FormGroup to notify paqrent of removed children
+            
+            void inform_the_parents(); // pass dependence information to parents node
+            void add_child_info(std::shared_ptr<Linked_Request> child, param_dependence_info& link_info);
+
         private:
             void render_required(bool already_sent) override;
             void render_linked_fields(const int i);

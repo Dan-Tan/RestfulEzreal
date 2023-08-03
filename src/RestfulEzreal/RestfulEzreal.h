@@ -8,6 +8,7 @@
 #include <vector>
 #include <array>
 #include <string>
+#include <vulkan/vulkan_core.h>
 
 #define _NO_FLAG ImGuiInputTextFlags_None
 #define _DEC_FLAG ImGuiInputTextFlags_CharsDecimal
@@ -102,5 +103,8 @@ namespace restfulEz {
                 forms.back()->set_id(this->next_id);
                 this->next_id += 1;
             }
+
+        private:
+            std::shared_ptr<Batch_Request> construct_batch();
     };
 }

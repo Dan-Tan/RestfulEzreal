@@ -1,7 +1,9 @@
 #include "QueryForm.h"
+#include "BatchRequests.h"
 #include "RestfulEzreal.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include <memory>
 #include <string_view>
 
 
@@ -213,8 +215,8 @@ namespace restfulEz {
 
     }
 
-    void QUERY_FORM::submit_request() {
-        request new_task{this->_game_ind, this->_endpoint_ind, this->_endpoint_method_ind};
+    request QUERY_FORM::construct_request() {
+        request new_task; new_task._game = this->_game_ind; new_task._endpoint = this->_endpoint_ind; new_task._endpoint_method = this->_endpoint_method_ind;
         for (int i = 0; i < this->_n_params; i++) { // add inputs into the request structure
             new_task.params.push_back(this->_params_in_form[i]);
         }
@@ -229,6 +231,11 @@ namespace restfulEz {
                 }
             }
         }
+        return new_task;
+    }
+
+    void QUERY_FORM::submit_request() {
+        request new_task = this->construct_request();
         this->sender->add_request(new_task);
         this->form_execute = true;
     }
@@ -385,6 +392,59 @@ namespace restfulEz {
         }
     }
 
+    static inline bool check_iterative(const std::vector<param_dependence_info>& links) {
+        for (auto& link : links) {
+            if (link.iterative) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void LinkedForm::construct_request_heap() {
+        request new_request = this->construct_request();
+        std::vector<std::size_t> required_pars;
+
+        for (auto& parent : this->parents) {
+            if (parent) {
+                required_pars.push_back(1);
+            }  else {
+                required_pars.push_back(0);
+            }
+        }
+        if (check_iterative(this->link_descriptions)) {
+            this->final_request = std::make_shared<Iterative_Request>(new_request, required_pars);
+        } else {
+            this->final_request = std::make_shared<Linked_Request>(new_request, required_pars);
+        }
+    }
+
+    void LinkedForm::add_child_info(std::shared_ptr<Linked_Request> child, param_dependence_info& link_info) {
+        
+        // check if previous dependence already exists, if so add additional dependence info (rare case but possible)
+        for (request_link& link_cont : this->final_request->child_links) {
+            if (child.get() == link_cont.request.get()) {
+                link_cont.dependence_information.push_back(link_info);
+                return;
+            }
+        };
+
+        // construct request link and add to child links
+        this->final_request->child_links.emplace_back(child, std::vector<param_dependence_info>({link_info}));
+    }
+
+    void LinkedForm::inform_the_parents() {
+
+        for (int i = 0; i < this->parents.size(); i++) { // should use zip iterator
+            if (this->link_descriptions[i].iterative) {
+                this->link_descriptions[i].iter_index = atoi(this->iter_index[i].param);
+                this->link_descriptions[i].iter_limit = atoi(this->iter_limit[i].param);
+            }
+            this->parents[i]->add_child_info(this->final_request, this->link_descriptions[i]);
+        }
+        
+    }
+
     static inline void delete_form(const std::shared_ptr<LinkedForm> to_remove) {
 
         for (std::shared_ptr<LinkedForm>& child_ptr : to_remove->get_children()) {
@@ -431,5 +491,49 @@ namespace restfulEz {
             }
         }
         owner.NewFormButton();
+    }
+
+    static std::shared_ptr<Linked_Request> construct_linked(Batch_Request current_progrss, std::shared_ptr<LinkedForm> unprocessed_form) {
+        std::shared_ptr<Linked_Request> new_request;
+
+        return new_request;
+    }
+
+    static inline bool has_dependencies(const std::vector<std::shared_ptr<LinkedForm>>& parents) {
+        for (const auto& par : parents) {
+            if (par) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::shared_ptr<Batch_Request> FormGroup::construct_batch() {
+
+        // ensure all forms have constructed unlinked requests
+        for (std::shared_ptr<LinkedForm>& form : this->forms) {
+            form->construct_request_heap();
+        }
+        
+        // construct links between forms
+        for (std::shared_ptr<LinkedForm>& form : this->forms) {
+            form->inform_the_parents();
+        }
+
+        std::shared_ptr<Batch_Request> final = std::make_shared<Batch_Request>(nullptr, nullptr, nullptr);
+        
+        // find first request (has no dependencies)
+        for (std::shared_ptr<LinkedForm>& form : this->forms) {
+            if (!has_dependencies(form->get_parents())) {
+                insert_request(final, form->get_final_request());
+            }
+        }
+
+        if (!final->request_node) { // this is not a definitive check, a request with circular dependencies may pass this.
+            throw std::runtime_error("Batch request has circular dependencies");
+        }
+        // now we go through the  process of linking parent request to child
+
+        return final;
     }
 }
