@@ -154,8 +154,6 @@ namespace restfulEz {
 
             if (ImGui::Button("Add")) {
                 this->NewQueryForm(game, endpoint, endpoint_method);
-                game = 0; endpoint = 0; endpoint_method = 0;
-                last_iter[0] = 0; last_iter[1] = 0; last_iter[2] = 0;
             }
     }
 

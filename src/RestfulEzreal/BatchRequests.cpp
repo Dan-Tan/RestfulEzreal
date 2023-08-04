@@ -23,19 +23,19 @@ namespace restfulEz {
                 throw std::runtime_error("Sequence of json keys or iter index gave non-iterative json object");
             }
 
-            Json::Value& temp_json = iterative_json;
-            request->param_indices.push_back(dep.iter_index);
+            Json::Value temp_json = iterative_json;
+            request->param_indices.push_back(dep.param_index);
             std::vector<PARAM_CONT> from_parent;
 
-            for (auto& json_lst_item : iterative_json) {
-                temp_json = json_lst_item;
+            for (int i = 0; i < iterative_json.size(); i++) { // problem here
+                temp_json = iterative_json[i];
                 for (int i = dep.iter_index; i < dep.json_keys.size(); i++) {
                     temp_json = temp_json[dep.json_keys.at(i).param];
                 }
                 from_parent.push_back(temp_json.asCString());
             }
             request->params_from_parent.push_back(from_parent);
-            request->completed_dependencies[dep.iter_index] = 1;
+            request->completed_dependencies[dep.param_index] = 1;
         }
         catch (Json::Exception& ex) {
             throw std::runtime_error("Invalid Json keys given, please re-check documentation");
@@ -100,6 +100,40 @@ namespace restfulEz {
         for (int i = 0; i < required_params.size(); i++) {
             this->completed_dependencies.push_back(0);
         }
+    }
+
+    bool Iterative_Request::fill_next() {
+        // if first request initialise beginning of progress
+        if (this->iter_progress.size() == 0) {
+            for (int i = 0; i < this->params_from_parent.size(); i++) {
+                this->iter_progress.push_back(0);
+            }
+        }
+
+        // fill the base class
+        int counter = 0;
+        for (auto& ind : this->param_indices) {
+            this->params[ind] = this->params_from_parent[counter][this->iter_progress[ind]];
+        }
+
+        bool finished = false;
+        // update progress
+        for (int i = this->iter_progress.size() - 1;  i >= 0; i--) {
+            // if current progress on given param has finished reset and continue iteration
+            if (this->iter_progress[i] == this->params_from_parent[i].size() - 1) {
+                this->iter_progress[i] = 0;
+                // if the first param has finished then all combinations have been executed
+                if (i == 0) {
+                    finished = true;
+                }
+            } else {
+                // increment progress
+                this->iter_progress[i]++;
+                break;
+            }
+        };
+        
+        return finished;
     }
 
     void insert_request(std::shared_ptr<Batch_Request> current_node, std::shared_ptr<Linked_Request> child_node) {

@@ -117,8 +117,10 @@ namespace restfulEz {
         bool finished = false;
 
         while(batch) {
-            this->Send_Request(*(batch->request_node));
-            batch->request_node->fill_dependencies();
+            while (!batch->request_node->fill_next()) {
+                this->Send_Request(*(batch->request_node));
+                batch->request_node->fill_dependencies();
+            }
             for (auto& link : batch->request_node->child_links) {
                 if (link.request->ready()) {
                     insert_request(batch, link.request);

@@ -81,6 +81,15 @@ namespace restfulEz {
         void fill_dependencies();
         // check if this request is ready to send
         bool ready();
+        int iter = 0;
+        virtual bool fill_next() {
+            if (iter == 0) {
+                iter++;
+                return false;
+            } else {
+                return true;
+            }
+        };
     } Linked_Request;
 
     typedef struct Iterative_Request : public Linked_Request {
@@ -92,6 +101,10 @@ namespace restfulEz {
         std::vector<std::vector<PARAM_CONT>> params_from_parent;
         // where to place the params
         std::vector<std::size_t> param_indices;
+        //  iterative progress
+        std::vector<std::size_t>  iter_progress;
+
+        bool fill_next() override;
     } Iterative_Request;
     
     // Batch requests are circular linked lists
