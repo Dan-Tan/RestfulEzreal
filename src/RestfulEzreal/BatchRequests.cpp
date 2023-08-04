@@ -51,7 +51,6 @@ namespace restfulEz {
             for (const PARAM_CONT& j_key : dep.json_keys) {
                 resp = resp[j_key.param];
             }
-
             req->params[dep.param_index] = resp.asCString();
             req->completed_dependencies[dep.param_index] = 1;
         }
@@ -70,13 +69,15 @@ namespace restfulEz {
             for (param_dependence_info& dep : link.dependence_information) {
                 if (dep.iterative) {
                     fill_iterative_dependencies(link.request, dep, this->response);
+                } else  {
+                    fill_noniter_dependencies(link.request, dep, this->response);
                 }
             }
         }
     }
 
     bool Linked_Request::ready() {
-        bool ready_to_send = false;
+        bool ready_to_send = true;
 
         if (this->required_dependencies.size() != this->completed_dependencies.size()) {
             throw std::logic_error("Mismatched required and completed dependencies. Check for proper construction");
@@ -90,20 +91,26 @@ namespace restfulEz {
     }
 
     Linked_Request::Linked_Request(const std::vector<std::size_t>& required_params) : required_dependencies(required_params) {
-        for (int i; i < required_params.size(); i++) {
+        for (int i = 0; i < required_params.size(); i++) {
             this->completed_dependencies.push_back(0);
         }
     }
 
     Linked_Request::Linked_Request(const request& base, const std::vector<std::size_t>& required_params) : required_dependencies(required_params), request(base) {
-        for (int i; i < required_params.size(); i++) {
+        for (int i = 0; i < required_params.size(); i++) {
             this->completed_dependencies.push_back(0);
         }
     }
 
     void insert_request(std::shared_ptr<Batch_Request> current_node, std::shared_ptr<Linked_Request> child_node) {
-        std::shared_ptr<Batch_Request> previous_node = current_node->previous;
+        if (!current_node->request_node) { // passed empty linked list, replace nullptr
+            current_node->previous = current_node;
+            current_node->next = current_node;
+            current_node->request_node = child_node;
+            return;
+        }
         std::shared_ptr<Batch_Request> new_node = std::make_shared<Batch_Request>(nullptr, child_node, nullptr); 
+        std::shared_ptr<Batch_Request> previous_node = current_node->previous;
         new_node->previous = previous_node;
         previous_node->next = new_node;
         current_node->previous = new_node;

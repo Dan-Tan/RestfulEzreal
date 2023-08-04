@@ -49,7 +49,14 @@ namespace restfulEz {
                 }
                 condition.notify_one();
             };
-            void add_batch_request(std::shared_ptr<Batch_Request> batch_task) {this->linked_requests.push(batch_task);};
+
+            void add_batch_request(std::shared_ptr<Batch_Request> batch_task) {
+                {
+                    std::unique_lock<std::mutex>  lock(queue_mutex);
+                    this->linked_requests.push(batch_task);
+                }
+                condition.notify_one();
+            };
 
         private: // methods
             void worker();

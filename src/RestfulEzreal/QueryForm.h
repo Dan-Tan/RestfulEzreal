@@ -85,7 +85,10 @@ namespace restfulEz {
             bool inputs_from_parents[5] = {false, false, false, false, false}; // forgive me
             
             std::size_t next_index = -1;
+            
 
+            // this field should only be set when a batch request is submited and not before TODO: add check to enforce this
+            std::size_t iterative_final = 0; // 0 - not computer, 1 - not iterative, 2 - iterative
             std::shared_ptr<Linked_Request> final_request = nullptr;
 
         public:
@@ -116,6 +119,8 @@ namespace restfulEz {
             
             void inform_the_parents(); // pass dependence information to parents node
             void add_child_info(std::shared_ptr<Linked_Request> child, param_dependence_info& link_info);
+
+            bool is_iterative();
 
         private:
             void render_required(bool already_sent) override;

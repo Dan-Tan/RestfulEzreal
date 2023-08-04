@@ -14,7 +14,7 @@ namespace restfulEz {
         operator char* () { return name; }
         P_NAME() {};
         P_NAME(const char* str) {
-            strncpy(name, str, sizeof(str));
+            strncpy(name, str, 32);
         };
     }P_NAME;
 
@@ -24,8 +24,11 @@ namespace restfulEz {
         operator std::string() { return std::string(param); };
         PARAM_CONT() {};
         PARAM_CONT(const char* str) {
-            strncpy(param, str, sizeof(str));
+            strncpy(param, str, 256);
         };
+        void  operator=(const char* str) {
+            strncpy(param, str, 256);
+        }
     }PARAM_CONT;
 
     typedef struct request {

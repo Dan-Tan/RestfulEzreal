@@ -93,6 +93,8 @@ namespace restfulEz {
             std::shared_ptr<LinkedForm> parent = nullptr;
             std::shared_ptr<LinkedForm> child = nullptr;
 
+            std::shared_ptr<RequestSender>  sender;
+
         public:
             FormGroup() = default;
             ~FormGroup() = default;
@@ -103,6 +105,9 @@ namespace restfulEz {
                 forms.back()->set_id(this->next_id);
                 this->next_id += 1;
             }
+
+            void set_sender(std::shared_ptr<RequestSender> new_sender) {this->sender = new_sender;};
+            void send_batch_request();
 
         private:
             std::shared_ptr<Batch_Request> construct_batch();

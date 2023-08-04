@@ -401,6 +401,35 @@ namespace restfulEz {
         return false;
     }
 
+    bool LinkedForm::is_iterative() {
+
+        if (this->iterative_final == 1) {
+            return false; // already computed by another form NOT ITERATIVE
+        } 
+        else if (this->iterative_final == 2) {
+            return true; // already computer by anoter form IS ITERATIVE
+        }
+
+        // if this request contains an iterative link then it must be iterative
+        bool contains_iterative = check_iterative(this->link_descriptions);
+        if (contains_iterative) {
+            this->iterative_final = 2;
+            return true;
+        }
+        // if this request has an iterative ancenstor it must also be iterative
+        for (const auto& par : this->parents) {
+            if (!par) { //  might be nullptr
+                continue; 
+            }
+            if (par->is_iterative()) {
+                this->iterative_final = 2;
+                return true; // if we find an iterative ancestor we are done
+            }
+        }
+        this->iterative_final = 1;
+        return false;
+    }
+
     void LinkedForm::construct_request_heap() {
         request new_request = this->construct_request();
         std::vector<std::size_t> required_pars;
@@ -412,7 +441,7 @@ namespace restfulEz {
                 required_pars.push_back(0);
             }
         }
-        if (check_iterative(this->link_descriptions)) {
+        if (this->is_iterative()) {
             this->final_request = std::make_shared<Iterative_Request>(new_request, required_pars);
         } else {
             this->final_request = std::make_shared<Linked_Request>(new_request, required_pars);
@@ -440,7 +469,9 @@ namespace restfulEz {
                 this->link_descriptions[i].iter_index = atoi(this->iter_index[i].param);
                 this->link_descriptions[i].iter_limit = atoi(this->iter_limit[i].param);
             }
-            this->parents[i]->add_child_info(this->final_request, this->link_descriptions[i]);
+            if (this->parents[i])  {
+                this->parents[i]->add_child_info(this->final_request, this->link_descriptions[i]);
+            }
         }
         
     }
@@ -490,6 +521,10 @@ namespace restfulEz {
                 }
             }
         }
+
+        if (ImGui::Button("Send Batch")) {
+            this->send_batch_request();
+        }
         owner.NewFormButton();
     }
 
@@ -532,8 +567,14 @@ namespace restfulEz {
         if (!final->request_node) { // this is not a definitive check, a request with circular dependencies may pass this.
             throw std::runtime_error("Batch request has circular dependencies");
         }
-        // now we go through the  process of linking parent request to child
 
         return final;
+    }
+
+    void FormGroup::send_batch_request() {
+
+        std::shared_ptr<Batch_Request> final_req =  this->construct_batch();
+
+        this->sender->add_batch_request(final_req);
     }
 }
