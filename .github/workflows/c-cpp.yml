@@ -22,7 +22,7 @@ jobs:
     - name: Install cURL
       run: sudo apt install libcurl4-openssl-dev
     - name: Install Jsoncpp
-      run: sudo apt install jsoncpp-dev
+      run: sudo apt install libjsoncpp-dev
     - name: Create build directory
       run: mkdir build && cd build
     - name: Configure Cmake
