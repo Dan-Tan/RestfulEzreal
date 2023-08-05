@@ -22,7 +22,7 @@ jobs:
        vulkan-components: Vulkan-Headers, Vulkan-Loader
        vulkan-use-cache: true
     - name: Install Xinerama (ImGui Dependency)
-      run: sudo apt install libxinerama-dev
+      run: sudo apt install libxinerama-dev, libxcursor-dev
     - name: Install cURL
       run: sudo apt install libcurl4-openssl-dev
     - name: Install Jsoncpp
