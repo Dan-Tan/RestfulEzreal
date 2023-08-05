@@ -26,6 +26,6 @@ jobs:
     - name: Create build directory
       run: mkdir build && cd build
     - name: Configure Cmake
-      run: cmake ..
+      run: cd build && cmake ..
     - name: Compilation Check
-      run: make
+      run: cd build && make
