@@ -25,8 +25,8 @@ jobs:
       run: sudo apt install libxinerama-dev libxcursor-dev libxi-dev
     - name: Install cURL
       run: sudo apt install libcurl4-openssl-dev
-    - name: Install Jsoncpp
-      run: sudo apt install libjsoncpp-dev
+    - name: Install vcpkg
+      run: git clone https://github.com/Microsoft/vcpkg.git && cd vcpkg && ./bootstrap-vcpkg.sh && ./vcpkg integrate install && ./vcpkg install jsoncpp
     - name: Create build directory
       run: mkdir build && cd build
     - name: Configure Cmake
