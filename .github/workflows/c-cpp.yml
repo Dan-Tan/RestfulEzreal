@@ -23,6 +23,8 @@ jobs:
        vulkan-use-cache: true
     - name: Install Xinerama (ImGui Dependency)
       run: sudo apt install libxinerama-dev libxcursor-dev libxi-dev
+    = name: GLFW Dependencies
+      run: sudo apt-get install libglfw3-dev libgl1-mesa-dev
     - name: Install cURL
       run: sudo apt install libcurl4-openssl-dev
     - name: Install vcpkg
