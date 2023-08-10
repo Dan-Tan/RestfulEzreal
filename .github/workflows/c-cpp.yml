@@ -30,6 +30,6 @@ jobs:
     - name: Create build directory
       run: mkdir build && cd build
     - name: Configure Cmake
-      run: cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=$HOME/work/RestfulEzrel/RestfulEzrel/vcpkg/scripts/buildsystems/vcpkg.cmake
+      run: cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=$HOME/work/RestfulEzreal/RestfulEzreal/vcpkg/scripts/buildsystems/vcpkg.cmake
     - name: Compilation Check
       run: cd build && make
