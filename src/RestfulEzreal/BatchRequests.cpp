@@ -4,163 +4,222 @@
 
 namespace restfulEz {
 
-    void fill_iterative_dependencies(std::shared_ptr<Linked_Request>& req, const param_dependence_info& dep, Json::Value& response) {
-        std::shared_ptr<Iterative_Request> request = std::reinterpret_pointer_cast<Iterative_Request>(req);
-        if (!response) {
-            throw std::invalid_argument("Nullptr passed to fill iterative dependencies. Make sure this function is only called from the structure method");
-        }
-
-        Json::Value& iterative_json = response;
+    const Json::Value* json_access_info::index_json(const Json::Value* to_index) const {
+        const Json::Value* to_return = to_index;
         try {
-            int iter_count = 0;
-            for (const PARAM_CONT& ind_key : dep.json_keys) {
-                iterative_json = iterative_json[ind_key.param];
-                if (iter_count == dep.iter_index - 1) {
-                    break;
-                }
+            for (const KEY_CONT& key : keys) {
+                to_index = &(*to_index)[key.key];
             }
-            if (!iterative_json.isArray()) { // User gave invalid json keys
-                throw std::runtime_error("Sequence of json keys or iter index gave non-iterative json object");
-            }
-
-            Json::Value temp_json = iterative_json;
-            request->param_indices.push_back(dep.param_index);
-            std::vector<PARAM_CONT> from_parent;
-
-            for (int i = 0; i < iterative_json.size(); i++) { // problem here
-                temp_json = iterative_json[i];
-                for (int i = dep.iter_index; i < dep.json_keys.size(); i++) {
-                    temp_json = temp_json[dep.json_keys.at(i).param];
-                }
-                from_parent.push_back(temp_json.asCString());
-            }
-            request->params_from_parent.push_back(from_parent);
-            request->completed_dependencies[dep.param_index] = 1;
         }
         catch (Json::Exception& ex) {
-            throw std::runtime_error("Invalid Json keys given, please re-check documentation");
+            throw std::runtime_error("Invalid json keys given");
+        }
+        return to_return;
+    }
+
+    static inline void access_params(const Json::Value* response, std::vector<PARAM_CONT>& to_add, const std::vector<KEY_CONT>& keys, std::size_t iter_limit) {
+        const Json::Value* access;
+
+        if (!response->isArray()) {
+            throw std::runtime_error("Invalid sequence of keys, Json is not array and cannot be iterated through");
+        }
+        std::size_t counter = 0;
+        for (auto& json :*response) {
+             
+            if (counter >= iter_limit) {break;}
+
+            access = &json;
+            for (auto& key : keys) {
+                access = &(*access)[key.key]; // not very nice
+            }
+            to_add.push_back((*access).asCString());
+            counter++;
         }
     }
 
-    void fill_noniter_dependencies(std::shared_ptr<Linked_Request>& req, const param_dependence_info& dep, Json::Value& response) {
-        if (!response) {
-            throw std::invalid_argument("Nullptr passed to fill non-iter dependencies. Make sure this function is only called from the structure method");
+    std::vector<PARAM_CONT> iter_access_info::get_params(std::shared_ptr<Json::Value> response) const {
+        std::vector<PARAM_CONT> to_ret;
+
+        const Json::Value* array_json = this->index_json(response.get());
+
+        access_params(response.get(), to_ret, this->access_after_iter.keys, this->iter_limit);
+
+        return to_ret;
+    }
+
+    std::vector<PARAM_CONT> iter_access_info::get_params(std::vector<std::shared_ptr<Json::Value>> responses) const {
+        std::vector<PARAM_CONT> to_ret;
+
+        const Json::Value* array_json = nullptr;
+
+        for (std::shared_ptr<Json::Value> result : responses) {
+            array_json = this->index_json(result.get());
+            access_params(result.get(), to_ret, this->access_after_iter.keys, this->iter_limit);
         }
+        return to_ret;
+    }
+
+    bool request_link::get_dependencies(std::vector<PARAM_CONT>& to_fill) {
         try {
-            Json::Value& resp = response;
-            for (const PARAM_CONT& j_key : dep.json_keys) {
-                resp = resp[j_key.param];
-            }
-            req->params[dep.param_index] = resp.asCString();
-            req->completed_dependencies[dep.param_index] = 1;
-        }
-        catch (Json::Exception& ex) {
-            throw std::runtime_error("User has passed the invalid json keys");
-        }
-    }
-
-    void Linked_Request::fill_dependencies() {
-        // check that the request has executed and the pointer to the reponse is not nullptr
-        if (!this->response) {
-            throw std::logic_error("Attempting to fill child dependencies whilst the parent pointer to response is nullptr. Make sure the parent has executed it's request before attempting to fill child dependencies");
-        }
-        // extract up to iteration
-        for (request_link& link : this->child_links) {
-            for (param_dependence_info& dep : link.dependence_information) {
-                if (dep.iterative) {
-                    fill_iterative_dependencies(link.request, dep, this->response);
-                } else  {
-                    fill_noniter_dependencies(link.request, dep, this->response);
-                }
+            std::size_t index = 0;
+            for (json_access_info& info : this->link_info) {
+                to_fill[this->param_indices[index]] = info.get_param(this->parent->request_results[0]);
+                index++;
             }
         }
+        catch (std::out_of_range &ex) {
+            throw std::out_of_range("Improper construction of links and dependencies, check constructor, or parent request not sent yet");
+        }
+        catch (std::runtime_error &ex) {
+            // user passed invalid json keys
+            return false;
+        }
+        return true;
     }
 
-    bool Linked_Request::ready() {
-        bool ready_to_send = true;
-
-        if (this->required_dependencies.size() != this->completed_dependencies.size()) {
-            throw std::logic_error("Mismatched required and completed dependencies. Check for proper construction");
-        }
-        // can you just check for vector equality here?
-        for (int i = 0; i < this->required_dependencies.size(); i++) {
-            ready_to_send &= (this->required_dependencies[i] == this->completed_dependencies[i]);
-        }
-
-        return ready_to_send;
-    }
-
-    Linked_Request::Linked_Request(const std::vector<std::size_t>& required_params) : required_dependencies(required_params) {
-        for (int i = 0; i < required_params.size(); i++) {
-            this->completed_dependencies.push_back(0);
-        }
-    }
-
-    Linked_Request::Linked_Request(const request& base, const std::vector<std::size_t>& required_params) : required_dependencies(required_params), request(base) {
-        for (int i = 0; i < required_params.size(); i++) {
-            this->completed_dependencies.push_back(0);
-        }
-    }
-
-    bool Iterative_Request::fill_next() {
-        // if first request initialise beginning of progress
-        if (this->iter_progress.size() == 0) {
-            for (int i = 0; i < this->params_from_parent.size(); i++) {
-                this->iter_progress.push_back(0);
+    bool iter_request_link::get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fill) {
+        try {
+            std::size_t counter = 0;
+            for (iter_access_info& iter_link : this->iter_link_info) {
+                to_fill[this->param_indices[counter]] = iter_link.get_params(this->parent->request_results);
+                counter++;
             }
+            return true;
         }
-
-        // fill the base class
-        int counter = 0;
-        for (auto& ind : this->param_indices) {
-            this->params[ind] = this->params_from_parent[counter][this->iter_progress[ind]];
+        catch (std::out_of_range &ex) {
+            throw std::out_of_range((std::string("Improper construction of links and dependencies, check construction")+ std::string(ex.what())).c_str());
         }
+        catch(std::runtime_error &ex) {
+            // user passed invalid json keys
+            return false;
+        }
+        return false;
+    }
 
-        bool finished = false;
-        // update progress
-        for (int i = this->iter_progress.size() - 1;  i >= 0; i--) {
-            // if current progress on given param has finished reset and continue iteration
-            if (this->iter_progress[i] == this->params_from_parent[i].size() - 1) {
-                this->iter_progress[i] = 0;
-                // if the first param has finished then all combinations have been executed
-                if (i == 0) {
-                    finished = true;
-                }
-            } else {
-                // increment progress
-                this->iter_progress[i]++;
-                break;
+    bool LinkedRequest::fill_request() {
+        try {
+            bool success = true;
+            for (request_link& link : this->dependencies) {
+                success &= link.get_dependencies(this->params);
             }
+            return success;
+        }
+        catch (std::runtime_error &ex) {
+            // user invalid json access key
+            return false;
+        }
+        catch (std::out_of_range &ex) {
+            // parent request has not been sent yet!!!
+            return false;
+        }
+    }
+
+    bool IterativeRequest::iter_fill_request() {
+        try {
+
+            this->fill_request();
+            bool success = true;
+            for (iter_request_link& iter_link : this->iter_dependencies) {
+                success &= iter_link.get_dependencies(this->param_fields); 
+            }
+            return success;
+        }
+        catch (std::runtime_error &ex) {
+            // user passed invalid json keys
+            return false;
+        }
+        catch (std::out_of_range &ex) {
+            // parent request has not been sent yet
+            return false;
         };
-        
-        return finished;
+        return false;
     }
 
-    void insert_request(std::shared_ptr<Batch_Request> current_node, std::shared_ptr<Linked_Request> child_node) {
-        if (!current_node->request_node) { // passed empty linked list, replace nullptr
+    static inline std::shared_ptr<ListNode> insert_node(std::shared_ptr<ListNode> current_node, std::shared_ptr<RequestNode> to_insert) {
+        std::shared_ptr<ListNode> new_node = std::make_shared<ListNode>(nullptr, to_insert, nullptr);
+        if (!current_node) {
+            current_node = new_node;
             current_node->previous = current_node;
             current_node->next = current_node;
-            current_node->request_node = child_node;
+            return current_node;
+        }
+
+        new_node->previous = current_node->previous;
+        new_node->next = current_node;
+
+        new_node->previous->next = new_node;
+        new_node->next->previous = new_node;
+
+        return current_node;
+
+    }
+
+    void CLinkedList::insert(std::shared_ptr<RequestNode> to_insert) {
+        this->length++;
+        if (!this->beginning) {
+            this->beginning = insert_node(this->beginning, to_insert);
+
+            this->end = this->beginning;
+            this->current_position = this->beginning;
             return;
         }
-        std::shared_ptr<Batch_Request> new_node = std::make_shared<Batch_Request>(nullptr, child_node, nullptr); 
-        std::shared_ptr<Batch_Request> previous_node = current_node->previous;
-        new_node->previous = previous_node;
-        previous_node->next = new_node;
-        current_node->previous = new_node;
-    }
-
-    std::shared_ptr<Batch_Request> remove_request(std::shared_ptr<Batch_Request> node) {
-        if (node->previous == node) {
-            return nullptr;
-        } else if (node->next == node) {
-            throw std::logic_error("Linked list passed was not circular, this method expects circular linked lists");
+        if (this->current_position == this->beginning) {
+            this->beginning = insert_node(this->beginning, to_insert);
+            return;
         }
-        std::shared_ptr<Batch_Request> previous_node = node->previous;
-        std::shared_ptr<Batch_Request> next_node = node->next;
-        previous_node->next = next_node;
-        next_node->previous = previous_node;
-        return next_node;
+
+        std::shared_ptr<ListNode> new_node = std::make_shared<ListNode>(this->current_position->previous, to_insert, this->current_position);
+        this->current_position->previous->next = new_node;
+        this->current_position->previous = new_node;
+        return;
+    };
+
+    void CLinkedList::remove() {
+        // if I decide to switch to non-circular linked list the conditionals are mostly not required but leave them for now
+        // removing the last remaining element
+        if (this->beginning == this->end) {
+            this->beginning = nullptr;
+            this->current_position = nullptr;
+            this->end = nullptr;
+            this->length = 0;
+            return;
+        }
+        // removing end element
+        if (this->end == this->current_position) {
+            this->end = this->current_position->previous;
+            this->end->next = this->beginning;
+            return;
+        }
+        // remove beginning element
+        if (this->beginning == this->current_position) {
+            // move the beginning forward one
+            this->beginning = this->current_position->next;
+            // reassigns the end->next to the new beginning
+            this->end->next = this->beginning;
+            // reassign the current position to the new beginning
+            this->current_position = this->beginning;
+            return;
+        }
+        this->current_position->previous = this->current_position->next;
+        this->current_position->next = this->current_position->previous;
+        this->current_position = this->current_position->next;
     }
 
+    request BatchRequest::FINISHED = request();
+
+    request& BatchRequest::get_next() {
+        if (this->parent_requests->finished()) {
+            bool finished = this->reformat_parents(); 
+            if (finished) {
+                return BatchRequest::FINISHED;
+            }
+        }
+        this->current_results = this->parent_requests->get_next();
+        this->current_request = this->current_results->send_request();
+        return *current_request;
+    }
+
+    void BatchRequest::insert_result(std::shared_ptr<Json::Value> result) {
+        this->current_results->request_results.push_back(result);
+    }
 }
