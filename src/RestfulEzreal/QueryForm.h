@@ -47,6 +47,8 @@ namespace restfulEz {
                     std::vector<PARAM_CONT> optional_inputs = {}, std::vector<ImGuiInputTextFlags> optional_types = {});
             ~QUERY_FORM() = default;
 
+            static QUERY_FORM make_form(const int game_ind, const int endpoint_ind, const int endpoint_method_ind); 
+
             void set_sender(std::shared_ptr<RequestSender> sender_client) {this->sender = sender_client;}
             void set_id(int new_id) {
                 this->_ID = std::string("##FORM") + std::to_string(new_id);
@@ -68,6 +70,11 @@ namespace restfulEz {
             float form_height = 0.0f;
 
         private:
+            static QUERY_FORM make_form_LOL(const int endpoint_ind, const int endpoint_method_ind); 
+            static QUERY_FORM make_form_TFT(const int endpoint_ind, const int endpoint_method_ind); 
+            static QUERY_FORM make_form_VAL(const int endpoint_ind, const int endpoint_method_ind); 
+            static QUERY_FORM make_form_LOR(const int endpoint_ind, const int endpoint_method_ind); 
+
             virtual void render_required(bool already_sent);
             virtual void render_optionals(bool already_sent);
             void submit_request();

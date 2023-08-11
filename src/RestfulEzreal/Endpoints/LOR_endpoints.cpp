@@ -22,28 +22,29 @@
 
 #define S_STATUS 0
 
-namespace restfulEz { // TODO: change to static factory method
-    static std::array<QUERY_FORM, 2> Lor_Match = {
-        QUERY_FORM(2, LOR, MATCH, M_BY_PUUID, "Legends of Runeterra", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, LOR, MATCH, M_BY_MATCH, "Legends of Runeterra", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG})
-    };
-    static std::array<QUERY_FORM, 1> Lor_Ranked = {
-        QUERY_FORM(1, LOR, RANKED, LEADERBOARD, "Legends of Runeterra", "Ranked", "Leaderboards", {"Routing"}, {_NO_FLAG})
-    };
-    static std::array<QUERY_FORM, 1> Lor_Status = {
-        QUERY_FORM(1, LOR, STATUS, S_STATUS, "Legends of Runeterra", "Status", "Status", {"Routing"}, {_NO_FLAG})
-    };
+namespace restfulEz { 
 
-    void RestfulEzreal::NewQueryFormLOR(int end_name, int endpoint_method) {
+    QUERY_FORM QUERY_FORM::make_formLOR(const int end_name, const int endpoint_method) {
 
         try {
             switch (end_name) {
                 case MATCH:
-                    this->pushNewForm(Lor_Match.at(endpoint_method));break;
+                    switch (endpoint_method) {
+                    case M_BY_PUUID:
+                        return QUERY_FORM(2, LOR, MATCH, M_BY_PUUID, "Legends of Runeterra", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case M_BY_MATCH:
+                        return QUERY_FORM(2, LOR, MATCH, M_BY_MATCH, "Legends of Runeterra", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    } break;
                 case RANKED:
-                    this->pushNewForm(Lor_Ranked.at(endpoint_method));break;
+                    switch (endpoint_method) {
+                    case LEADERBOARD:
+                        return QUERY_FORM(1, LOR, RANKED, LEADERBOARD, "Legends of Runeterra", "Ranked", "Leaderboards", {"Routing"}, {_NO_FLAG}); break;
+                    } break;
                 case STATUS:
-                    this->pushNewForm(Lor_Status.at(endpoint_method));break;
+                    switch (endpoint_method) {
+                    case S_STATUS:
+                        return QUERY_FORM(1, LOR, STATUS, S_STATUS, "Legends of Runeterra", "Status", "Status", {"Routing"}, {_NO_FLAG}); break;
+                    } break;
             }
         } 
         catch (std::out_of_range const* ex) {

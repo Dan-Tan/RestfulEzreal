@@ -13,23 +13,33 @@ namespace restfulEz {
         QUERY_FORM(3, 0, 0, 1, "Riot", "Account", "By Riot ID", {"Routing", "Game Name", "Tagline"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG}),
         QUERY_FORM(3, 0, 0, 2, "Riot", "Account", "By Game By Puuid", {"Routing", "Game", "PUUID"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG})
     };
-    //
-    void RestfulEzreal::NewQueryForm(int gameName, int end_name, int endpoint_method) {
+    // factory methods
+    QUERY_FORM QUERY_FORM::make_form(const int gameName, const int end_name, const int endpoint_method) {
         switch (gameName) {
-            case 0: // RIOT
-                this->pushNewForm(Account[endpoint_method]); break;
+            case 0:
+                switch (endpoint_method) {
+                    case 0:
+                        return QUERY_FORM(2, 0, 0, 0, "Riot", "Account", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case 1:
+                        return QUERY_FORM(3, 0, 0, 1, "Riot", "Account", "By Riot ID", {"Routing", "Game Name", "Tagline"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG}); break;
+                    case 2:
+                        return QUERY_FORM(3, 0, 0, 2, "Riot", "Account", "By Game By Puuid", {"Routing", "Game", "PUUID"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG}); break;
+                } break;
             case 1: // LEAGUE OF LEGENDS
-                this->NewQueryFormLOL(end_name, endpoint_method); break;
+                return make_form_LOL(end_name, endpoint_method); break;
             case 2: // TEAMFIGHT TACTICS
-                this->NewQueryFormTFT(end_name, endpoint_method); break;
+                return make_form_TFT(end_name, endpoint_method); break;
             case 3: // VALORANT
-                this->NewQueryFormLOR(end_name, endpoint_method); break;
+                return make_form_VAL(end_name, endpoint_method); break;
             case 4: // LEGENDS OF RUNETERR
-                this->NewQueryFormVAL(end_name, endpoint_method); break;
+                return make_form_LOR(end_name, endpoint_method); break;
             default:
                 throw std::invalid_argument("Invalid Game Name");
         }
 
+    }
+    void RestfulEzreal::NewQueryForm(int gameName, int end_name, int endpoint_method) {
+        this->pushNewForm(QUERY_FORM::make_form(gameName, end_name, endpoint_method));
     }
 
     void RestfulEzreal::NewFormButton() {

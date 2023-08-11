@@ -60,10 +60,6 @@ namespace restfulEz {
             int _current_id = 1;
 
             void NewQueryForm(int gameName, int end_name, int endpoint_method); // purely for readability and maintenance
-            void NewQueryFormLOL(int end_name, int endpoint_method);
-            void NewQueryFormTFT(int end_name, int endpoint_method); 
-            void NewQueryFormVAL(int end_name, int endpoint_method);
-            void NewQueryFormLOR(int end_name, int endpoint_method);
 
             void pushNewForm(QUERY_FORM new_form);
 

@@ -23,32 +23,34 @@
 #define STATUS 3
 
 namespace restfulEz {
-    static std::array<QUERY_FORM, 1> Val_Content = {
-        QUERY_FORM(1, 4, 0, 1, "Valorant", "Content", "Content", {"Routing"}, {_NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG})
-    };
-    static std::array<QUERY_FORM, 3> Val_Match = {
-        QUERY_FORM(2, 4, 1, 0, "Valorant", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, 4, 1, 1, "Valorant", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, 4, 1, 2, "Valorant", "Match", "By Queue", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG})
-    };
-    static std::array<QUERY_FORM, 1> Val_Ranked = {
-        QUERY_FORM(2, 4, 2, 0, "Valorant", "Ranked", "By Act", {"Routing", "Act ID"}, {_NO_FLAG, _NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG})
-    };
-    static std::array<QUERY_FORM, 1> Val_Status = {
-        QUERY_FORM(1, 4, 3, 0, "Valorant", "Status", "Status", {"Routing"}, {_NO_FLAG})
-    };
 
-    void RestfulEzreal::NewQueryFormVAL(int end_name, int endpoint_method) {
+    QUERY_FORM QUERY_FORM::make_form_VAL(const int end_name, const int endpoint_method) {
         
         switch (end_name) {
             case CONTENT:
-                this->pushNewForm(Val_Content.at(endpoint_method)); break;
+                switch (endpoint_method) {
+                    case 1:
+                        return QUERY_FORM(1, 4, 0, 1, "Valorant", "Content", "Content", {"Routing"}, {_NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG}); break;
+                } break;
             case MATCH:
-                this->pushNewForm(Val_Match.at(endpoint_method)); break;
+                switch (endpoint_method) {
+                    case 0:
+                        return QUERY_FORM(2, 4, 1, 0, "Valorant", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case 1:
+                        return QUERY_FORM(2, 4, 1, 1, "Valorant", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case 2:
+                        return QUERY_FORM(2, 4, 1, 2, "Valorant", "Match", "By Queue", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG}); break;
+                } break;
             case RANKED:
-                this->pushNewForm(Val_Ranked.at(endpoint_method)); break;
+                switch (endpoint_method) {
+                    case 0:
+                        return QUERY_FORM(2, 4, 2, 0, "Valorant", "Ranked", "By Act", {"Routing", "Act ID"}, {_NO_FLAG, _NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG}); break;
+                } break;
             case STATUS:
-                this->pushNewForm(Val_Status.at(endpoint_method)); break;
+                switch (endpoint_method) {
+                    case 0:
+                        return QUERY_FORM(1, 4, 3, 0, "Valorant", "Status", "Status", {"Routing"}, {_NO_FLAG}); break;
+                } break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index");
         }

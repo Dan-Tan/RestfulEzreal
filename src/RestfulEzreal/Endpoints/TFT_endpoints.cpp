@@ -36,39 +36,49 @@
 #define S_BY_SUMMONER_ID 3
 
 namespace restfulEz {
-    static std::array<QUERY_FORM, 7> Tft_League = {
-        QUERY_FORM(1, TFT, LEAGUE, CHALLENGER, "Teamfight Tactics", "League", "Challenger", {"Routing"}, {_NO_FLAG}),
-        QUERY_FORM(1, TFT, LEAGUE, GRANDMASTER, "Teamfight Tactics", "League", "Grandmaster", {"Routing"}, {_NO_FLAG}),
-        QUERY_FORM(1, TFT, LEAGUE, MASTER, "Teamfight Tactics", "League", "Master", {"Routing"}, {_NO_FLAG}),
-        QUERY_FORM(2, TFT, LEAGUE, L_BY_SUMMONER_ID, "Teamfight Tactics", "League", "By Summoner ID", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, TFT, LEAGUE, L_BY_LEAGUE_ID, "Teamfight Tactics", "League", "By League ID", {"Routing", "League ID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, TFT, LEAGUE, QUEUE_TOP, "Teamfight Tactics", "League", "Queue Top", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(3, TFT, LEAGUE, L_BY_TIER_DIVISION, "Teamfight Tactics", "League", "By Tier Division", {"Routing", "Tier", "Divisionk"}, {_NO_FLAG, _NO_FLAG, _NO_FLAG}, true, {"count"}, {"1"}, {_DEC_FLAG})
-    };
-    static std::array<QUERY_FORM, 2> Tft_Match = {
-        QUERY_FORM(2, TFT, MATCH, M_BY_PUUID, "Teamfight Tactics", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}, true, {"start", "endTime", "startTime", "count"}, {"0", "", "", "20"}, {_DEC_FLAG, _DEC_FLAG, _DEC_FLAG, _DEC_FLAG}),
-        QUERY_FORM(2, TFT, MATCH, M_BY_MATCH_ID, "Teamfight Tactics", "Match", "By Match ID", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG})
-    };
-    static std::array<QUERY_FORM, 1> Tft_Status = {
-        QUERY_FORM(1, TFT, STATUS, S_STATUS, "Teamfight Tactics", "Status", "Status", {"Routing"}, {_NO_FLAG})
-    };
-    static std::array<QUERY_FORM, 4> Tft_Summoner = {
-        QUERY_FORM(2, TFT, SUMMONER, S_BY_ACCOUNT_ID, "Teamfight Tactics", "Summoner", "By Account ID", {"Routing", "Account ID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, TFT, SUMMONER, S_BY_NAME, "Teamfight Tactics", "Summoner", "By Name", {"Routing", "Name"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, TFT, SUMMONER, S_BY_PUUID, "Teamfight Tactics", "Summoner", "By PUUID", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(2, TFT, SUMMONER, S_BY_SUMMONER_ID, "Teamfight Tactics", "Summoner", "By Summoner ID", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG})
-    };
 
-    void RestfulEzreal::NewQueryFormTFT(int end_name, int endpoint_method) {
+    QUERY_FORM QUERY_FORM::make_form_TFT(const int end_name, const int endpoint_method) {
         switch (end_name) {
             case LEAGUE:
-                this->pushNewForm(Tft_League.at(endpoint_method)); break;
+                switch (endpoint_method) {
+                    case CHALLENGER:
+                        return QUERY_FORM(1, TFT, LEAGUE, CHALLENGER, "Teamfight Tactics", "League", "Challenger", {"Routing"}, {_NO_FLAG}); break;
+                    case GRANDMASTER:
+                        return QUERY_FORM(1, TFT, LEAGUE, GRANDMASTER, "Teamfight Tactics", "League", "Grandmaster", {"Routing"}, {_NO_FLAG}); break;
+                    case MASTER:
+                        return QUERY_FORM(1, TFT, LEAGUE, MASTER, "Teamfight Tactics", "League", "Master", {"Routing"}, {_NO_FLAG}); break;
+                    case L_BY_SUMMONER_ID:
+                        return QUERY_FORM(2, TFT, LEAGUE, L_BY_SUMMONER_ID, "Teamfight Tactics", "League", "By Summoner ID", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case L_BY_LEAGUE_ID:
+                        return QUERY_FORM(2, TFT, LEAGUE, L_BY_LEAGUE_ID, "Teamfight Tactics", "League", "By League ID", {"Routing", "League ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case QUEUE_TOP:
+                        return QUERY_FORM(2, TFT, LEAGUE, QUEUE_TOP, "Teamfight Tactics", "League", "Queue Top", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case L_BY_TIER_DIVISION:
+                        return QUERY_FORM(3, TFT, LEAGUE, L_BY_TIER_DIVISION, "Teamfight Tactics", "League", "By Tier Division", {"Routing", "Tier", "Divisionk"}, {_NO_FLAG, _NO_FLAG, _NO_FLAG}, true, {"count"}, {"1"}, {_DEC_FLAG}); break;
+                } break;
             case MATCH:
-                this->pushNewForm(Tft_Match.at(endpoint_method)); break;
+                switch (endpoint_method) {
+                    case M_BY_PUUID:
+                        return QUERY_FORM(2, TFT, MATCH, M_BY_PUUID, "Teamfight Tactics", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}, true, {"start", "endTime", "startTime", "count"}, {"0", "", "", "20"}, {_DEC_FLAG, _DEC_FLAG, _DEC_FLAG, _DEC_FLAG}); break;
+                    case M_BY_MATCH_ID:
+                        return QUERY_FORM(2, TFT, MATCH, M_BY_MATCH_ID, "Teamfight Tactics", "Match", "By Match ID", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                } break;
             case STATUS:
-                this->pushNewForm(Tft_Status.at(endpoint_method)); break;
+                switch (endpoint_method) {
+                    case S_STATUS:
+                        return QUERY_FORM(1, TFT, STATUS, S_STATUS, "Teamfight Tactics", "Status", "Status", {"Routing"}, {_NO_FLAG}); break;
+                } break;
             case SUMMONER:
-                this->pushNewForm(Tft_Summoner.at(endpoint_method)); break;
+                switch (endpoint_method) {
+                    case S_BY_ACCOUNT_ID:
+                        return QUERY_FORM(2, TFT, SUMMONER, S_BY_ACCOUNT_ID, "Teamfight Tactics", "Summoner", "By Account ID", {"Routing", "Account ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case S_BY_NAME:
+                        return QUERY_FORM(2, TFT, SUMMONER, S_BY_NAME, "Teamfight Tactics", "Summoner", "By Name", {"Routing", "Name"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case S_BY_PUUID:
+                        return QUERY_FORM(2, TFT, SUMMONER, S_BY_PUUID, "Teamfight Tactics", "Summoner", "By PUUID", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case S_BY_SUMMONER_ID:
+                        return QUERY_FORM(2, TFT, SUMMONER, S_BY_SUMMONER_ID, "Teamfight Tactics", "Summoner", "By Summoner ID", {"Routing", "Summoner ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                } break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index");
         }
