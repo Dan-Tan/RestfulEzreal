@@ -24,36 +24,70 @@
 
 namespace restfulEz {
 
-    QUERY_FORM QUERY_FORM::make_form_VAL(const int end_name, const int endpoint_method) {
+    std::shared_ptr<LinkedInterface> LinkedInterface::make_linked_VAL(const int game, const int end_name, const int endpoint_method) {
+        
+        switch (end_name) {
+            case CONTENT:
+                switch (endpoint_method) {
+                    case 0:
+                        return std::make_shared<LinkedForm<1>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
+                } break;
+            case MATCH:
+                switch (endpoint_method) {
+                    case 0:
+                        return std::make_shared<LinkedForm<2>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
+                    case 1:
+                        return std::make_shared<LinkedForm<2>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
+                    case 2:
+                        return std::make_shared<LinkedForm<2>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
+                } break;
+            case RANKED:
+                switch (endpoint_method) {
+                    case 0:
+                        return std::make_shared<LinkedForm<2>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
+                } break;
+            case STATUS:
+                switch (endpoint_method) {
+                    case 0:
+                        return std::make_shared<LinkedForm<1>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
+                } break;
+            default:
+                throw std::invalid_argument("Invalid Endpoint Index");
+        }
+        throw std::invalid_argument("Invalid Endpoint Index");
+    }
+
+    BaseForm BaseForm::make_form_VAL(const int end_name, const int endpoint_method) {
         
         switch (end_name) {
             case CONTENT:
                 switch (endpoint_method) {
                     case 1:
-                        return QUERY_FORM(1, 4, 0, 1, "Valorant", "Content", "Content", {"Routing"}, {_NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG}); break;
+                        return BaseForm(1, 4, 0, 1, "Valorant", "Content", "Content", {"Routing"}, {_NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG}); break;
                 } break;
             case MATCH:
                 switch (endpoint_method) {
                     case 0:
-                        return QUERY_FORM(2, 4, 1, 0, "Valorant", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                        return BaseForm(2, 4, 1, 0, "Valorant", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}); break;
                     case 1:
-                        return QUERY_FORM(2, 4, 1, 1, "Valorant", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                        return BaseForm(2, 4, 1, 1, "Valorant", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
                     case 2:
-                        return QUERY_FORM(2, 4, 1, 2, "Valorant", "Match", "By Queue", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG}); break;
+                        return BaseForm(2, 4, 1, 2, "Valorant", "Match", "By Queue", {"Routing", "Queue"}, {_NO_FLAG, _NO_FLAG}); break;
                 } break;
             case RANKED:
                 switch (endpoint_method) {
                     case 0:
-                        return QUERY_FORM(2, 4, 2, 0, "Valorant", "Ranked", "By Act", {"Routing", "Act ID"}, {_NO_FLAG, _NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG}); break;
+                        return BaseForm(2, 4, 2, 0, "Valorant", "Ranked", "By Act", {"Routing", "Act ID"}, {_NO_FLAG, _NO_FLAG}, true, {"locale"}, {""}, {_NO_FLAG}); break;
                 } break;
             case STATUS:
                 switch (endpoint_method) {
                     case 0:
-                        return QUERY_FORM(1, 4, 3, 0, "Valorant", "Status", "Status", {"Routing"}, {_NO_FLAG}); break;
+                        return BaseForm(1, 4, 3, 0, "Valorant", "Status", "Status", {"Routing"}, {_NO_FLAG}); break;
                 } break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index");
         }
+        throw std::invalid_argument("Invalid Endpoint Index");
     }
 
     void RequestSender::Send_VAL(request& task) {

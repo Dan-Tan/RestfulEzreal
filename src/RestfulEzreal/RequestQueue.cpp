@@ -23,7 +23,7 @@ namespace restfulEz {
     void RequestSender::worker() {
         while (true) {
             request task;
-            std::shared_ptr<Batch_Request> b_task;
+            std::shared_ptr<BatchRequest> b_task;
             bool iterative = false;
 
             {
@@ -111,22 +111,18 @@ namespace restfulEz {
         counter++;
     }
 
-    void RequestSender::Send_Batch_Request(std::shared_ptr<Batch_Request> batch) {
+    void RequestSender::Send_Batch_Request(std::shared_ptr<BatchRequest> batch) {
 
         // assume all tasks in the linked are ready to execute
-        bool finished = false;
+        bool not_finished = true;
 
-        while(batch) {
-            while (!batch->request_node->fill_next()) {
-                this->Send_Request(*(batch->request_node));
-                batch->request_node->fill_dependencies();
+        request& next = batch->get_next();
+        while (!next.same_endpoint(BatchRequest::FINISHED)) {
+            this->Send_Request(next);
+            while (batch->insert_result(next.response)) {
+                this->Send_Request(next);
             }
-            for (auto& link : batch->request_node->child_links) {
-                if (link.request->ready()) {
-                    insert_request(batch, link.request);
-                }
-            }
-            batch = remove_request(batch);
+            next = batch->get_next();
         }
     }
 }

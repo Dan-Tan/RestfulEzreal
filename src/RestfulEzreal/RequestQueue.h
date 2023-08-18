@@ -34,7 +34,7 @@ namespace restfulEz {
             std::queue<request> simple_requests = {}; 
 
             // Requests with a chain of dependecies
-            std::queue<std::shared_ptr<Batch_Request>> linked_requests; 
+            std::queue<std::shared_ptr<BatchRequest>> linked_requests; 
 
         public:
             RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_directory);
@@ -50,7 +50,7 @@ namespace restfulEz {
                 condition.notify_one();
             };
 
-            void add_batch_request(std::shared_ptr<Batch_Request> batch_task) {
+            void add_batch_request(std::shared_ptr<BatchRequest> batch_task) {
                 {
                     std::unique_lock<std::mutex>  lock(queue_mutex);
                     this->linked_requests.push(batch_task);
@@ -63,7 +63,7 @@ namespace restfulEz {
             void write_response_file(const request& task);
 
             void Send_Request(request& task);
-            void Send_Batch_Request(std::shared_ptr<Batch_Request> task);
+            void Send_Batch_Request(std::shared_ptr<BatchRequest> task);
 
             void Send_Riot(request& task);
             void Send_LOL(request& task);

@@ -8,22 +8,41 @@
 
 namespace restfulEz {
 
-    static std::array<QUERY_FORM, 3> Account = {
-        QUERY_FORM(2, 0, 0, 0, "Riot", "Account", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}),
-        QUERY_FORM(3, 0, 0, 1, "Riot", "Account", "By Riot ID", {"Routing", "Game Name", "Tagline"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG}),
-        QUERY_FORM(3, 0, 0, 2, "Riot", "Account", "By Game By Puuid", {"Routing", "Game", "PUUID"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG})
-    };
-    // factory methods
-    QUERY_FORM QUERY_FORM::make_form(const int gameName, const int end_name, const int endpoint_method) {
+    std::shared_ptr<LinkedInterface> LinkedInterface::make_linked(const int gameName, const int end_name, const int endpoint_method) {
         switch (gameName) {
             case 0:
                 switch (endpoint_method) {
                     case 0:
-                        return QUERY_FORM(2, 0, 0, 0, "Riot", "Account", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                        return std::make_shared<LinkedForm<2>>(BaseForm::make_form(gameName, end_name, endpoint_method)); break;
                     case 1:
-                        return QUERY_FORM(3, 0, 0, 1, "Riot", "Account", "By Riot ID", {"Routing", "Game Name", "Tagline"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG}); break;
+                        return std::make_shared<LinkedForm<3>>(BaseForm::make_form(gameName, end_name, endpoint_method)); break;
                     case 2:
-                        return QUERY_FORM(3, 0, 0, 2, "Riot", "Account", "By Game By Puuid", {"Routing", "Game", "PUUID"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG}); break;
+                        return std::make_shared<LinkedForm<3>>(BaseForm::make_form(gameName, end_name, endpoint_method)); break;
+                } break;
+            case 1: // LEAGUE OF LEGENDS
+                return make_linked_LOL(gameName, end_name, endpoint_method); break;
+            case 2: // TEAMFIGHT TACTICS
+                return make_linked_TFT(gameName, end_name, endpoint_method); break;
+            case 3: // VALORANT
+                return make_linked_VAL(gameName, end_name, endpoint_method); break;
+            case 4: // LEGENDS OF RUNETERR
+                return make_linked_LOR(gameName, end_name, endpoint_method); break;
+            default:
+                throw std::invalid_argument("Invalid Game Name");
+        }
+        throw std::invalid_argument("Invalid Game Name");
+    }
+
+    BaseForm BaseForm::make_form(const int gameName, const int end_name, const int endpoint_method) {
+        switch (gameName) {
+            case 0:
+                switch (endpoint_method) {
+                    case 0:
+                        return BaseForm(2, 0, 0, 0, "Riot", "Account", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case 1:
+                        return BaseForm(3, 0, 0, 1, "Riot", "Account", "By Riot ID", {"Routing", "Game Name", "Tagline"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG}); break;
+                    case 2:
+                        return BaseForm(3, 0, 0, 2, "Riot", "Account", "By Game By Puuid", {"Routing", "Game", "PUUID"}, {_NO_FLAG,_NO_FLAG,_NO_FLAG}); break;
                 } break;
             case 1: // LEAGUE OF LEGENDS
                 return make_form_LOL(end_name, endpoint_method); break;
@@ -36,10 +55,10 @@ namespace restfulEz {
             default:
                 throw std::invalid_argument("Invalid Game Name");
         }
-
+        throw std::invalid_argument("Invalid Game Name");
     }
     void RestfulEzreal::NewQueryForm(int gameName, int end_name, int endpoint_method) {
-        this->pushNewForm(QUERY_FORM::make_form(gameName, end_name, endpoint_method));
+        this->pushNewForm(BaseForm::make_form(gameName, end_name, endpoint_method));
     }
 
     void RestfulEzreal::NewFormButton() {

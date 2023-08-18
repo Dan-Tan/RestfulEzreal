@@ -4,6 +4,10 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include <memory>
+#include <functional>
+#include <numeric>
+#include <format>
+#include <numeric>
 #include <string_view>
 
 
@@ -17,7 +21,32 @@ namespace restfulEz {
         return this->_ID == other_form._ID;
     }
 
-    QUERY_FORM::QUERY_FORM(const std::size_t n_params, const int game_ind, const int endpoint_ind, const int endpoint_method_ind, const char* game_name, 
+    BaseForm::BaseForm(const BaseForm& copy) {
+        this->_game_ind = copy._game_ind;
+        this->_endpoint_ind = copy._endpoint_ind;
+        this->_endpoint_method_ind = copy._endpoint_method_ind;
+
+        this->_game_name = copy._game_name;
+        this->_endpoint = copy._endpoint;
+        this->_endpoint_method = copy._endpoint_method;
+        
+        this->_param_names = copy._param_names;
+        this->_params_in_form = copy._params_in_form;
+        this->_type_ordering = copy._type_ordering;
+
+        this->_accepts_optional = copy._accepts_optional;
+        this->_optional_names = copy._optional_names;
+        this->_optional_inputs = copy._optional_inputs;
+        this->_optional_types = copy._optional_types;
+        this->_optionals_to_send = copy._optionals_to_send;
+
+        this->_n_used_optional_p1 = copy._n_used_optional_p1;
+        this->_n_params = copy._n_params;
+        
+        this->_ID = copy._ID;
+    }
+
+    BaseForm::BaseForm(const std::size_t n_params, const int game_ind, const int endpoint_ind, const int endpoint_method_ind, const char* game_name, 
             const char* endpoint, const char* endpoint_method, 
             std::vector<P_NAME> param_names, std::vector<ImGuiInputTextFlags> type_ordering,
             bool accepts_optional, std::vector<P_NAME> optional_names, 
@@ -45,6 +74,19 @@ namespace restfulEz {
         this->_endpoint_ind = endpoint_ind;
         this->_endpoint_method_ind = endpoint_method_ind;
     };
+
+    QUERY_FORM::QUERY_FORM(const std::size_t n_params, const int game_ind, const int endpoint_ind, const int endpoint_method_ind, const char* game_name, 
+            const char* endpoint, const char* endpoint_method, 
+            std::vector<P_NAME> param_names, std::vector<ImGuiInputTextFlags> type_ordering,
+            bool accepts_optional, std::vector<P_NAME> optional_names, 
+            std::vector<PARAM_CONT> optional_inputs, std::vector<ImGuiInputTextFlags> optional_types) 
+        : BaseForm(
+                n_params, game_ind, endpoint_ind, endpoint_method_ind, 
+                game_name, endpoint, endpoint_method, 
+                param_names, type_ordering, 
+                accepts_optional, optional_names, 
+                optional_inputs, optional_types
+        ) {};
 
     void QUERY_FORM::render_title() {
         ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
@@ -241,341 +283,151 @@ namespace restfulEz {
         this->form_execute = true;
     }
 
-
-    static inline void render_noniterative_form(param_dependence_info& link_description, std::size_t* next_index) {
-
-        static char _par_id[] = "Select Parent##0";
-        _par_id[15] = link_description.param_index;
-
-        if (ImGui::Button(_par_id)) {
-            *next_index = link_description.param_index;             // write in child form
-        }
-        static char _id[] = "##01";
-        _id[2] = (char) link_description.param_index + '0';
-        static int counter = 0;
-        ImGui::Text("Json Index Keys");
-        for (int i = 0; i < link_description.json_keys.size(); i++) {
-            _id[3] = (char)counter + '0';
-            ImGui::InputText(_id, link_description.json_keys[i], 256, ImGuiInputTextFlags_None);
-            counter += 1;
-        }
-        counter = 0;
-
-        // add key button
-        static char _add_id[] = "Add Key##0";
-        _add_id[9] = link_description.param_index;
-        if (ImGui::Button(_add_id)) {
-            link_description.json_keys.push_back("");
-        }
-
-        // remove key button
-        static char _rem_id[] = "Remove Key##0";
-        _rem_id[12] = link_description.param_index;
-        if (link_description.json_keys.size() != 0) {
-            if (ImGui::Button(_rem_id)) {
-                link_description.json_keys.pop_back();
+    void BatchForm::render_form() {
+        this->newFormButton();
+        if (this->linking_mode) {
+            for (std::shared_ptr<LinkedInterface>& form : this->forms) {
+                if (form->render_form(true)) {
+                    this->parent = form;
+                };
             }
-        }
-    }
-
-    static inline void render_iterative_form(param_dependence_info& link_description, PARAM_CONT& iter_index, PARAM_CONT& iter_limit, std::size_t* next_ind) {
-        // ImGui Ids to avoid conflicts
-        static char _ind_id[] = "Json Array Index##0";
-        static char _lim_id[] = "Iteration Limit##0";
-        // change id to avoid conflicts
-        _ind_id[18] = link_description.param_index;
-        _ind_id[17] = link_description.param_index;
-        // display input text fields
-        ImGui::InputText(_ind_id, iter_index.param, 256, ImGuiInputTextFlags_CharsDecimal);
-        ImGui::InputText(_lim_id, iter_limit.param, 256, ImGuiInputTextFlags_CharsDecimal);
-        // display input fields for the json keys
-        render_noniterative_form(link_description, next_ind);
-    }
-
-    void LinkedForm::render_linked_fields(const int i) {
-
-        static char itera[] = "Iterative##1";
-        itera[11] = (char) i + '0';
-        ImGui::SameLine();
-
-        ImGui::Checkbox(itera, &this->link_descriptions[i].iterative);
-
-        if (this->link_descriptions[i].iterative) {
-            render_iterative_form(this->link_descriptions[i], this->iter_index[i], this->iter_limit[i], &this->next_index); 
         } else {
-            render_noniterative_form(this->link_descriptions[i], &this->next_index);
-        }
-    }
-
-    void LinkedForm::render_required(bool already_sent) {
-        if (already_sent) {
-            ImVec4 disabled_color = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, disabled_color);
-        }
-        static float text_width = ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC;
-        ImGui::PushItemWidth(text_width);
-        static char check_link[] = "Link##1";
-
-        for (int i = 0; i < this->get_n_params(); i++) {
-            check_link[6] = i;
-            ImGui::Checkbox(check_link, &this->inputs_from_parents[i]);
-            if (!this->inputs_from_parents[i]) {
-                this->render_singular_field(i, already_sent);
-            } else {
-                this->render_linked_fields(i);
-            }
-        }
-        ImGui::PopItemWidth();
-        if (already_sent) {
-            ImGui::PopStyleColor();
-        }
-    }
-
-    bool LinkedForm::render_form_return() {
-        this->render_form();
-
-        return this->next_index != -1;
-    }
-
-    bool LinkedForm::render_link_mode() {
-        static float height_l = ImGui::GetStyle().ItemSpacing.y;
-        ImGui::BeginChild(this->get_ID().data(), ImVec2(ImGui::GetContentRegionAvail().x, this->form_height + 2 * height_l), true, ImGuiWindowFlags_ChildWindow);
-        this->render_title();
-        if (this->next_index != -1) {
-            ImGui::Text("Currently Selecting Parent...");
-        } 
-        else if (ImGui::Button("Select as Parent")) {
-            ImGui::EndChild();
-            return true;
-        }
-        ImGui::EndChild();
-        return false;
-    }
-
-    void LinkedForm::complete_link(std::shared_ptr<LinkedForm> next_parent) {
-        if (this->next_index == -1) {
-            throw std::logic_error("parent added before index recorded");
-        }
-        this->parents[this->next_index] = next_parent;
-        this->next_index = -1;
-    }
-
-    void LinkedForm::cancel_link() {
-        this->next_index = -1;
-    }
-
-    void LinkedForm::insert_child(std::shared_ptr<LinkedForm> child) {
-        this->children.push_back(child);
-    }
-
-    void LinkedForm::remove_parent(const LinkedForm& parent) {
-
-        for (std::shared_ptr<LinkedForm>& form_ptr : this->parents) {
-            if (form_ptr != nullptr && *form_ptr == parent) {
-                form_ptr = nullptr;
+            for (std::shared_ptr<LinkedInterface>& form : this->forms) {
+                if (form->render_form()) {
+                    this->child = form;
+                };
             }
         }
     }
 
-    void LinkedForm::remove_child(const LinkedForm& child) {
+    void BatchForm::newFormButton() {
+        static const char* GAMES_[] = { "Riot", "League of Legends", "TeamfightTactics", "Legends of Runeterra", "Valorant"};
 
-        std::vector<int> to_remove;
-
-        for (int i = 0; i < this->children.size(); i++) {
-            if (*this->children[i] == child) {
-                to_remove.push_back(i);
-            }
-        }
-        int counter = 0;
-        for (auto& ind : to_remove) {
-            this->children.erase(this->children.begin() + ind - counter);
-            counter++;
-        }
-    }
-
-    static inline bool check_iterative(const std::vector<param_dependence_info>& links) {
-        for (auto& link : links) {
-            if (link.iterative) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool LinkedForm::is_iterative() {
-
-        if (this->iterative_final == 1) {
-            return false; // already computed by another form NOT ITERATIVE
-        } 
-        else if (this->iterative_final == 2) {
-            return true; // already computer by anoter form IS ITERATIVE
-        }
-
-        // if this request contains an iterative link then it must be iterative
-        bool contains_iterative = check_iterative(this->link_descriptions);
-        if (contains_iterative) {
-            this->iterative_final = 2;
-            return true;
-        }
-        // if this request has an iterative ancenstor it must also be iterative
-        for (const auto& par : this->parents) {
-            if (!par) { //  might be nullptr
-                continue; 
-            }
-            if (par->is_iterative()) {
-                this->iterative_final = 2;
-                return true; // if we find an iterative ancestor we are done
-            }
-        }
-        this->iterative_final = 1;
-        return false;
-    }
-
-    void LinkedForm::construct_request_heap() {
-        request new_request = this->construct_request();
-        std::vector<std::size_t> required_pars;
-
-        for (auto& parent : this->parents) {
-            if (parent) {
-                required_pars.push_back(1);
-            }  else {
-                required_pars.push_back(0);
-            }
-        }
-        if (this->is_iterative()) {
-            this->final_request = std::make_shared<Iterative_Request>(new_request, required_pars);
-        } else {
-            this->final_request = std::make_shared<Linked_Request>(new_request, required_pars);
-        }
-    }
-
-    void LinkedForm::add_child_info(std::shared_ptr<Linked_Request> child, param_dependence_info& link_info) {
-        
-        // check if previous dependence already exists, if so add additional dependence info (rare case but possible)
-        for (request_link& link_cont : this->final_request->child_links) {
-            if (child.get() == link_cont.request.get()) {
-                link_cont.dependence_information.push_back(link_info);
-                return;
-            }
+        static const char GAME_ENDPOINTS_[5][9][18] = {
+        { "Account" },
+        { "Champion Mastery", "Champion Rotation", "Clash", "League", "Challenges", "Status", "Match", "Summoner", "Spectator" },
+        { "League", "Match", "Status", "Summoner" },
+        { "Match", "Ranked", "Status" },
+        { "Content", "Match", "Ranked", "Status" }
         };
 
-        // construct request link and add to child links
-        this->final_request->child_links.emplace_back(child, std::vector<param_dependence_info>({link_info}));
+
+        static const char ENDPOINT_METHODS_[5][9][7][24] = {
+        {{"By Puuid", "By Riot ID", "By Game"}},
+        {{ "By Summoner ID", "By Summoner By Champion", "Top By Summoner", "Scores By Summoner" },
+        { "Rotation" },
+        {"By Summoner ID", "By Team", "Tourament By Team", "By Tournament"},
+        {"Challenger", "Grandmaster", "Master", "By Summoner ID", "By League ID", "Specific League", "Experimental"},
+        {"Configuration", "Percentiles", "Challenge Configuration", "Challenge Leaderboard", "Challenge Percentiles", "By Puuid"},
+        {"v4 (recommended)", "v3"},
+        {"By Match ID", "Timeline", "By Puuid"},
+        {"By RSO Puuid", "By Account ID", "By Name", "By Puuid", "By Summoner ID"},
+        {"By Summoner ID", "Featured Games"}
+        },
+        {{ "Challenger", "Grandmaster", "Master", "By Summoner ID", "By League ID", "Queue Top", "By Tier Division"},
+            { "By Puuid", "By Match ID"},
+            {"v1"},
+            {"By Account", "By Name", "By Puuid", "By Summoner ID"}
+        },
+        {{ "By Puuid", "By Match ID"},
+            { "Leaderboards"},
+            {"v1"}
+        },
+        {{ "Content"},
+            { "By Match ID", "By Puuid", "By  Queue"},
+            {"By Act"},
+            {"Status"}
+        }
+        };
+
+        static const int Game_endpoint_length[5] = {1, 9, 4, 3, 4};
+
+        static const int endpoint_lengths[5][9] = {
+            {3},
+            {4, 1, 4, 7, 6, 2, 3, 5, 2},
+            {7, 2, 1, 3},
+            {2, 1, 1},
+            {1, 3, 1, 1}
+        };
+
+        static int last_iter[] = {0, 0, 0};
+
+        static int game = 0;
+        static int endpoint = 0;
+        static int endpoint_method = 0;
+
+        if (game != last_iter[0]) {
+            last_iter[0] = game;
+            endpoint = 0;
+            endpoint_method = 0;
+            last_iter[1] = 0;
+            last_iter[2] = 0;
+        }
+        else if (last_iter[1] != endpoint) {
+            last_iter[1] = endpoint;
+            endpoint_method = 0;
+            last_iter[2] = 0;
+        }
+
+        float drop_down_width = (0.3f * ImGui::GetContentRegionAvail().x);
+        ImGui::SetNextItemWidth(drop_down_width);
+        if (ImGui::BeginCombo("##input1", GAMES_[game], ImGuiComboFlags_None))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(GAMES_); n++)
+            {
+                const bool is_selected = (game == n);
+                if (ImGui::Selectable(GAMES_[n], is_selected))
+                    game = n;
+
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(drop_down_width);
+        if (ImGui::BeginCombo("##input2", GAME_ENDPOINTS_[game][endpoint]))
+        {
+            for (int n = 0; n < Game_endpoint_length[game]; n++)
+            {
+                const bool is_selected = (endpoint == n);
+                if (ImGui::Selectable(GAME_ENDPOINTS_[game][n], is_selected))
+                    endpoint = n;
+
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(drop_down_width);
+        if (ImGui::BeginCombo("##input3", ENDPOINT_METHODS_[game][endpoint][endpoint_method]))
+        {
+            for (int n = 0; n < endpoint_lengths[game][endpoint]; n++)
+            {
+                const bool is_selected = (endpoint_method == n);
+                if (ImGui::Selectable(ENDPOINT_METHODS_[game][endpoint][n], is_selected))
+                    endpoint_method = n;
+
+                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+
+        if (ImGui::Button("Add")) {
+            this->pushNewForm(game, endpoint, endpoint_method);
+        }
+    }
+    
+    void BatchForm::pushNewForm(const int game, const int endpoint, const int endpoint_method) {
+        this->forms.push_back(LinkedInterface::make_linked(game, endpoint, endpoint_method));
+        this->forms.back()->set_id(this->current_ID);
+        this->current_ID++;
     }
 
-    void LinkedForm::inform_the_parents() {
-
-        for (int i = 0; i < this->parents.size(); i++) { // should use zip iterator
-            if (this->link_descriptions[i].iterative) {
-                this->link_descriptions[i].iter_index = atoi(this->iter_index[i].param);
-                this->link_descriptions[i].iter_limit = atoi(this->iter_limit[i].param);
-            }
-            if (this->parents[i])  {
-                this->parents[i]->add_child_info(this->final_request, this->link_descriptions[i]);
-            }
-        }
-        
-    }
-
-    static inline void delete_form(const std::shared_ptr<LinkedForm> to_remove) {
-
-        for (std::shared_ptr<LinkedForm>& child_ptr : to_remove->get_children()) {
-            child_ptr->remove_parent(*to_remove);
-        }
-
-        for (std::shared_ptr<LinkedForm>& parent_ptr : to_remove->get_parents()) {
-            if (parent_ptr) { // parent_ptr can be nullptr
-                parent_ptr->remove_child(*parent_ptr);
-            }
-        }
-    }
-
-    void FormGroup::render_group(RestfulEzreal& owner) {
-
-        int counter = 0;
-        int to_remove = -1;
-        for (std::shared_ptr<LinkedForm>& form : this->forms) {
-            if (form->check_remove()) {
-                delete_form(form);
-                to_remove = counter;
-            }
-            counter += 1;
-        }
-        if (to_remove != -1) {
-            this->forms.erase(this->forms.begin() + to_remove);
-        }
-        
-        if (this->link_mode) {
-            for (auto& linked_form : this->forms) {
-                if (linked_form->render_link_mode()) {
-                    this->parent = linked_form;
-                    this->child->complete_link(linked_form);
-                    this->parent->insert_child(this->child);
-                    this->link_mode = false;
-                }
-            }
-        } else {
-            for (auto& linked_form : this->forms) {
-                if (linked_form->render_form_return()) {
-                    this->child = linked_form;
-                    this->link_mode = true;
-                }
-            }
-        }
-
-        if (ImGui::Button("Send Batch")) {
-            this->send_batch_request();
-        }
-        owner.NewFormButton();
-    }
-
-    static std::shared_ptr<Linked_Request> construct_linked(Batch_Request current_progrss, std::shared_ptr<LinkedForm> unprocessed_form) {
-        std::shared_ptr<Linked_Request> new_request;
-
-        return new_request;
-    }
-
-    static inline bool has_dependencies(const std::vector<std::shared_ptr<LinkedForm>>& parents) {
-        for (const auto& par : parents) {
-            if (par) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    std::shared_ptr<Batch_Request> FormGroup::construct_batch() {
-
-        // ensure all forms have constructed unlinked requests
-        for (std::shared_ptr<LinkedForm>& form : this->forms) {
-            form->construct_request_heap();
-        }
-        
-        // construct links between forms
-        for (std::shared_ptr<LinkedForm>& form : this->forms) {
-            form->inform_the_parents();
-        }
-
-        std::shared_ptr<Batch_Request> final = std::make_shared<Batch_Request>(nullptr, nullptr, nullptr);
-        
-        // find first request (has no dependencies)
-        for (std::shared_ptr<LinkedForm>& form : this->forms) {
-            if (!has_dependencies(form->get_parents())) {
-                insert_request(final, form->get_final_request());
-            }
-        }
-
-        if (!final->request_node) { // this is not a definitive check, a request with circular dependencies may pass this.
-            throw std::runtime_error("Batch request has circular dependencies");
-        }
-
-        return final;
-    }
-
-    void FormGroup::send_batch_request() {
-
-        std::shared_ptr<Batch_Request> final_req =  this->construct_batch();
-
-        this->sender->add_batch_request(final_req);
-    }
 }

@@ -13,6 +13,8 @@
 #define P_INPUT_LENGTH 256
 
 namespace restfulEz {
+
+    // DIFFERENT CHAR[] containers for use in IMGUI::INPUTTEXT() to avoid strings
     
     // Param name container
     typedef struct P_NAME {
@@ -46,14 +48,20 @@ namespace restfulEz {
         operator char*() {return key;};
         operator std::string() {return std::string(key);};
         KEY_CONT() {};
+        KEY_CONT(const char* str) {
+            strncpy(key, str, KEY_LENGTH);
+        };
 
         void operator=(const char* str) {
             strncpy(key, str, KEY_LENGTH);
         };
     } KEY_CONT;
-    
 
-    // most primitive request struct, enough information to send a single request
+
+
+    
+    // MOST PRIMITIVE REQUEST STRUCT, ENOUGH INFORMATION TO SEND A SINGLE REQUEST
+        
     typedef struct request {
         int _game;
         int _endpoint;
@@ -63,9 +71,18 @@ namespace restfulEz {
         std::vector<P_NAME> optional_names;
         std::vector<PARAM_CONT> optional_inputs;
 
-        std::shared_ptr<Json::Value> response;
+        Json::Value response;
+
+        bool same_endpoint(const request& other) {
+            bool same = true;
+            same &= this->_game == other._game;
+            same &= this->_endpoint == other._endpoint;
+            same &= this->_endpoint_method == other._endpoint_method;
+            return same;
+        }
         
         request() {};
+        request(const int game, const int endpoint, const int endpoint_method);
         request(const request& copy) { // copy constructor
             this->_game = copy._game;
             this->_endpoint = copy._endpoint;
@@ -80,9 +97,10 @@ namespace restfulEz {
     } request;
 
     struct LinkedRequest;
-    union RequestNode;
+    struct RequestNode;
 
-    // defines how to get param information from parent request
+    // JSON ACCESS INFO
+        
     typedef struct json_access_info {
         std::vector<KEY_CONT> keys;
         const Json::Value* index_json(const Json::Value* to_index) const;
@@ -98,6 +116,11 @@ namespace restfulEz {
         std::vector<PARAM_CONT> get_params(std::vector<std::shared_ptr<Json::Value>> responses) const; 
     } iter_access_info;
 
+
+
+
+    // LINK BETWEEN REQUESTS
+    
     typedef struct base_link {
         std::shared_ptr<RequestNode> parent;
         std::vector<std::size_t> param_indices;
@@ -113,46 +136,69 @@ namespace restfulEz {
         bool get_dependencies(std::vector<PARAM_CONT>& to_fill) override;
     } request_link;
     
-    // describes the relation ship between parent and child request when the child needs to fill a vector of dependencies
+    // describes the relationship between parent and child request when the child needs to fill a vector of dependencies
     typedef struct iter_request_link : public base_link {
         std::vector<iter_access_info> iter_link_info;
         bool get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fills) override;
     } iter_request_link;
 
-    typedef struct response {
-        std::vector<std::shared_ptr<Json::Value>> responses;
-    } response;
+
+
+    // TOP LEVEL INDIVIDUAL LINKED REQUEST STRUCTURE 
 
     typedef struct LinkedRequest : request {
         std::vector<request_link> dependencies;
+        std::vector<std::shared_ptr<RequestNode>> children;
 
         bool fill_request();
-        virtual bool ready(); // check each link if completed
+        // Non-iterative requests only send one request so when asked to update they will respond with completed
+        virtual bool update_base() {return false;}
+        virtual bool ready();
     } LinkedRequest;
 
     typedef struct IterativeRequest : LinkedRequest {
         std::vector<iter_request_link> iter_dependencies;
         std::vector<std::vector<PARAM_CONT>>  param_fields;
         std::vector<std::size_t> param_indices;
-
-        bool iter_fill_request();
+        
+        // response false when the Iterative request has been completed
+        bool update_base() override;
         bool ready() override;
+        bool iter_fill_request();
+
+        std::vector<std::size_t> progress;
     } IterativeRequest;
-    
-    // A node in the Batch request tree representing both an unsent or sent request;
-    typedef union RequestNode {
+
+    typedef union ReqNode {
         std::unique_ptr<LinkedRequest> unsent_request;
         std::vector<std::shared_ptr<Json::Value>> request_results;
-        RequestNode(std::unique_ptr<LinkedRequest> unsent) {
-            this->unsent_request = std::move(unsent);
-        };
+        ReqNode(std::unique_ptr<LinkedRequest> unsent) : unsent_request(std::move(unsent)) {};
+        ~ReqNode() {};
+    } ReqNode;
+    
+    // A node in the Batch request tree representing both an unsent or sent request;
+    typedef struct RequestNode {
+        bool sent = false;
+        std::unique_ptr<ReqNode> _node;
+        RequestNode(std::unique_ptr<LinkedRequest> unsent) : _node(std::make_unique<ReqNode>(std::move(unsent))) {};
+
         std::unique_ptr<LinkedRequest> send_request() { // when the request is send remove the unique ptr to the request
-            std::unique_ptr<LinkedRequest> to_send = std::move(this->unsent_request);
-            this->request_results = std::vector<std::shared_ptr<Json::Value>>();
+            std::unique_ptr<LinkedRequest> to_send = std::move(this->_node->unsent_request);
+            this->_node->request_results = std::vector<std::shared_ptr<Json::Value>>();
+            this->sent =true;
             return to_send;
         };
+        ~RequestNode() {
+            // manually deallocate if the request was never sent
+            if (!this->sent) {
+                this->_node->unsent_request.reset();
+            }
+        }
     } RequestNode;
 
+
+    // LINKED LIST REQUEST STRUCTURE FOR REQUEST EXECUTION  
+    
     typedef struct ListNode {
         std::shared_ptr<ListNode> previous = nullptr;
         std::shared_ptr<RequestNode> node = nullptr;
@@ -170,11 +216,13 @@ namespace restfulEz {
         public:
             void insert(std::shared_ptr<RequestNode> to_insert);
             void remove();
-            bool finished();
+            inline bool finished() {return this->current_position == this->end;};
             std::shared_ptr<RequestNode> get_next();
 
             std::size_t size() const {return this->length;};
     };
+
+    // CLASS ENCODING ALL REQUESTS THAT MAKE UP A BATCH
 
     class BatchRequest {
 
@@ -189,7 +237,7 @@ namespace restfulEz {
             ~BatchRequest();
 
             request& get_next();
-            void insert_result(std::shared_ptr<Json::Value> result);
+            bool insert_result(const Json::Value& result);
             // request returned when the batch request is finished
             static request FINISHED;
 
@@ -197,5 +245,4 @@ namespace restfulEz {
             bool reformat_parents();
 
     };
-
 }

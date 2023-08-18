@@ -24,26 +24,26 @@
 
 namespace restfulEz { 
 
-    QUERY_FORM QUERY_FORM::make_formLOR(const int end_name, const int endpoint_method) {
+    std::shared_ptr<LinkedInterface> LinkedInterface::make_linked_LOR(const int game, const int end_name, const int endpoint_method) {
 
         try {
             switch (end_name) {
                 case MATCH:
                     switch (endpoint_method) {
                     case M_BY_PUUID:
-                        return QUERY_FORM(2, LOR, MATCH, M_BY_PUUID, "Legends of Runeterra", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                        return std::make_shared<LinkedForm<2>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
                     case M_BY_MATCH:
-                        return QUERY_FORM(2, LOR, MATCH, M_BY_MATCH, "Legends of Runeterra", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                        return std::make_shared<LinkedForm<2>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
                     } break;
                 case RANKED:
                     switch (endpoint_method) {
                     case LEADERBOARD:
-                        return QUERY_FORM(1, LOR, RANKED, LEADERBOARD, "Legends of Runeterra", "Ranked", "Leaderboards", {"Routing"}, {_NO_FLAG}); break;
+                        return std::make_shared<LinkedForm<1>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
                     } break;
                 case STATUS:
                     switch (endpoint_method) {
                     case S_STATUS:
-                        return QUERY_FORM(1, LOR, STATUS, S_STATUS, "Legends of Runeterra", "Status", "Status", {"Routing"}, {_NO_FLAG}); break;
+                        return std::make_shared<LinkedForm<1>>(BaseForm::make_form(game, end_name, endpoint_method)); break;
                     } break;
             }
         } 
@@ -52,6 +52,38 @@ namespace restfulEz {
             ss << "Invalid Endpoint and Method arguement. (Endpoint, Method): (" << end_name << ", " << endpoint_method << ")";
             throw std::invalid_argument(ss.str());
         }
+        throw std::invalid_argument("Invalid endpoint given");
+    }
+
+    BaseForm BaseForm::make_form_LOR(const int end_name, const int endpoint_method) {
+
+        try {
+            switch (end_name) {
+                case MATCH:
+                    switch (endpoint_method) {
+                    case M_BY_PUUID:
+                        return BaseForm(2, LOR, MATCH, M_BY_PUUID, "Legends of Runeterra", "Match", "By Puuid", {"Routing", "PUUID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    case M_BY_MATCH:
+                        return BaseForm(2, LOR, MATCH, M_BY_MATCH, "Legends of Runeterra", "Match", "By Match", {"Routing", "Match ID"}, {_NO_FLAG, _NO_FLAG}); break;
+                    } break;
+                case RANKED:
+                    switch (endpoint_method) {
+                    case LEADERBOARD:
+                        return BaseForm(1, LOR, RANKED, LEADERBOARD, "Legends of Runeterra", "Ranked", "Leaderboards", {"Routing"}, {_NO_FLAG}); break;
+                    } break;
+                case STATUS:
+                    switch (endpoint_method) {
+                    case S_STATUS:
+                        return BaseForm(1, LOR, STATUS, S_STATUS, "Legends of Runeterra", "Status", "Status", {"Routing"}, {_NO_FLAG}); break;
+                    } break;
+            }
+        } 
+        catch (std::out_of_range const* ex) {
+            std::ostringstream ss;
+            ss << "Invalid Endpoint and Method arguement. (Endpoint, Method): (" << end_name << ", " << endpoint_method << ")";
+            throw std::invalid_argument(ss.str());
+        }
+        throw std::invalid_argument("Invalid endpoint given");
     }
 
     void RequestSender::Send_LOR(request& task) {

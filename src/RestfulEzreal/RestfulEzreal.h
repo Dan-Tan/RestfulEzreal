@@ -24,11 +24,8 @@ enum current_page {
 
 namespace restfulEz {
 
-    class FormGroup;
-
     class RestfulEzreal : public Walnut::Layer
     {
-        friend class FormGroup;
         private:
             std::shared_ptr<client::RiotApiClient> _underlying_client = nullptr;
             current_page* _on_display;
@@ -39,14 +36,14 @@ namespace restfulEz {
             bool send_next_request = false;
             bool client_tested = false;
 
-            std::shared_ptr<FormGroup> batch_group = nullptr;
+            std::shared_ptr<BatchForm> batch_group;
 
             int _next_form_id = 1;
 
         public:
             RestfulEzreal(current_page* on_display) {
                 this->_on_display = on_display;
-                this->batch_group = std::make_shared<FormGroup>();
+                this->batch_group = std::make_shared<BatchForm>();
             };
 
             void OnUIRender() override;
@@ -76,36 +73,5 @@ namespace restfulEz {
             void render_rate_status() {};
 
             void config_check();
-    };
-
-    class FormGroup {
-
-        private:
-            // shared_ptr easier to pass between parent child nodes
-            std::vector<std::shared_ptr<LinkedForm>> forms;
-            int next_id = 1;
-
-            bool link_mode = false;
-            std::shared_ptr<LinkedForm> parent = nullptr;
-            std::shared_ptr<LinkedForm> child = nullptr;
-
-            std::shared_ptr<RequestSender>  sender;
-
-        public:
-            FormGroup() = default;
-            ~FormGroup() = default;
-
-            void render_group(RestfulEzreal& owner);
-            void add_form(QUERY_FORM& form) {
-                forms.push_back(std::make_shared<LinkedForm>(form)); // trigger constructor
-                forms.back()->set_id(this->next_id);
-                this->next_id += 1;
-            }
-
-            void set_sender(std::shared_ptr<RequestSender> new_sender) {this->sender = new_sender;};
-            void send_batch_request();
-
-        private:
-            std::shared_ptr<Batch_Request> construct_batch();
     };
 }

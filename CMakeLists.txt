@@ -12,14 +12,14 @@ endif()
 
 
 add_library(RestfulEzreal STATIC 
+    src/RestfulEzreal/QueryForm.cpp
+    src/RestfulEzreal/RequestQueue.cpp
+    src/RestfulEzreal/BatchRequests.cpp
     src/RestfulEzreal/Endpoints/endpoints.cpp 
     src/RestfulEzreal/Endpoints/LOL_endpoints.cpp
     src/RestfulEzreal/Endpoints/TFT_endpoints.cpp
     src/RestfulEzreal/Endpoints/LOR_endpoints.cpp
     src/RestfulEzreal/Endpoints/VAL_endpoints.cpp
-    src/RestfulEzreal/QueryForm.cpp
-    src/RestfulEzreal/RequestQueue.cpp
-    src/RestfulEzreal/BatchRequests.cpp
     src/RestfulEzreal/RestfulEzreal.cpp)
 
 add_subdirectory(riot-cpp/src)

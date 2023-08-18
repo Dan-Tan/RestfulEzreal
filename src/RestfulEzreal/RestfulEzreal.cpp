@@ -142,14 +142,10 @@ namespace restfulEz {
 
     void RestfulEzreal::pushNewForm(QUERY_FORM new_form) {
         this->_current_id += 1;
-        if (*this->_on_display == ADVANCED_REQUESTS) {
-            this->batch_group->add_form(new_form);
-        } else {
-            this->_current_forms.push_back(new_form);
-            this->_current_forms.back().set_id(this->_next_form_id);
-            this->_current_forms.back().set_sender(request_sender);
-            this->_next_form_id += 1;
-        }
+        this->_current_forms.push_back(new_form);
+        this->_current_forms.back().set_id(this->_next_form_id);
+        this->_current_forms.back().set_sender(request_sender);
+        this->_next_form_id += 1;
     }
 
     inline bool file_exists(const std::string& name) {
@@ -250,7 +246,7 @@ namespace restfulEz {
 
     void RestfulEzreal::render_advanced_requests() {
 
-        this->batch_group->render_group(*this);
+        this->batch_group->render_form();
 
     }
 }
