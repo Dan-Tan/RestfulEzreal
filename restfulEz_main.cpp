@@ -1,4 +1,5 @@
 #include "Walnut/Application.h"
+#include "Walnut/EntryPoint.h"
 #include "src/RestfulEzreal/RestfulEzreal.h"
 
 class ExampleLayer : public Walnut::Layer

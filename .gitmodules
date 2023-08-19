@@ -3,4 +3,4 @@
 	url = git@github.com:Dan-Tan/riot-cpp.git
 [submodule "Walnut"]
 	path = Walnut
-	url = https://github.com/StudioCherno/Walnut.git
+	url = git@github.com:valerioformato/Walnut.git
