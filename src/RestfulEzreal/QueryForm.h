@@ -174,9 +174,14 @@ namespace restfulEz {
                 this->display_form.emplace_back("");
             };
             bool render_form(bool linking = false) override;
-            void set_id(int new_id) {
+            void set_id(int new_id) override {
                 this->_ID = std::string("##FORM") + std::to_string(new_id);
             }
+            static void set_default_size(ImVec2 new_size) {
+                // static member
+                LinkedForm::default_size = new_size;
+            }
+            static ImVec2 default_size;
             
             //void insert_parent(std::shared_ptr<LinkedInterface> child) override;
             //void insert_child(std::shared_ptr<LinkedInterface> parent) override;
@@ -204,16 +209,19 @@ namespace restfulEz {
     };
 
     class BatchForm {
+        private:
+            bool first_iter = true;
+            std::vector<std::shared_ptr<LinkedInterface>> forms;
+            int current_ID = 0;
+            
+            // for linking
+            bool linking_mode = false;
+            std::shared_ptr<LinkedInterface> parent;
+            std::shared_ptr<LinkedInterface> child;
 
-        std::vector<std::shared_ptr<LinkedInterface>> forms;
-        int current_ID = 0;
-        
-        // for linking
-        bool linking_mode = false;
-        std::shared_ptr<LinkedInterface> parent;
-        std::shared_ptr<LinkedInterface> child;
+            std::shared_ptr<RequestSender> sender;
 
-        std::shared_ptr<RequestSender> sender;
+            ImVec2 contained_form_size;
 
         public:
             BatchForm() = default;
@@ -294,9 +302,9 @@ namespace restfulEz {
             ImGui::Checkbox(_iter_id, &this->iterative[ind]);
 
             if (this->iterative[ind]) {
-                render_iter_json(this->iter_info[ind]->keys, this->iter_info[ind]->access_after_iter.keys, this->iter_limits[ind], ind);
+                render_iter_json(this->iter_info[ind-1]->keys, this->iter_info[ind-1]->access_after_iter.keys, this->iter_limits[ind-1], ind);
             } else {
-                render_json_form(this->iter_info[ind]->keys, ind);
+                render_json_form(this->iter_info[ind-1]->keys, ind);
             }
         } else {
             ImGui::InputText(this->_param_names[ind].name, this->_params_in_form[ind].param, P_INPUT_LENGTH, this->_type_ordering[ind]);
@@ -321,7 +329,7 @@ namespace restfulEz {
         } else {
             ImGui::Text("Not Ready");
         }
-        for_<true>(static_cast<std::function<void(const std::size_t)>>(std::bind_front(&LinkedForm<N>::display_field, this)), std::make_index_sequence<N-1>{});
+        for_<false>(static_cast<std::function<void(const std::size_t)>>(std::bind_front(&LinkedForm<N>::display_field, this)), std::make_index_sequence<N>{});
     }
 
     template<std::size_t N>
@@ -330,7 +338,7 @@ namespace restfulEz {
         // check if the field is linked (not a full validation, full validation would require knowledge of the response structure (I'm too lazy))
         if (this->linked[ind]) { return this->parents[ind-1];
         } else {
-            return this->_params_in_form[ind].param != "";
+            return strlen(this->_params_in_form[ind].param) != 0;
         }
     }
 
@@ -412,17 +420,27 @@ namespace restfulEz {
 
     template<std::size_t N>
     void LinkedForm<N>::render_all_fields() {
-        for_<false>(static_cast<std::function<void(const std::size_t)>>(std::bind_front(&LinkedForm<N>::render_field, this)), std::make_index_sequence<N-1>{});
+        for_<true>(static_cast<std::function<void(const std::size_t)>>(std::bind_front(&LinkedForm<N>::render_field, this)), std::make_index_sequence<N-1>{});
     }
 
     template<std::size_t N>
     bool LinkedForm<N>::render_popup() {
-        if (ImGui::Button("Close")) {
-            this->on_close_popup();
-            this->configuring = false;
+
+        ImGui::OpenPopup("Configure Request");
+
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+        if (ImGui::BeginPopupModal("Configure Request", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            if (ImGui::Button("Close")) {
+                this->on_close_popup();
+                this->configuring = false;
+            }
+            this->render_routing();
+            this->render_all_fields();
+
+            ImGui::EndPopup();
         }
-        this->render_routing();
-        this->render_all_fields();
         return false;
     }
 
@@ -434,13 +452,19 @@ namespace restfulEz {
     template<std::size_t N>
     bool LinkedForm<N>::render_form(bool linking) {
 
+        if (!this->window_initiated) {
+            this->windowposition = ImGui::GetWindowPos();
+            this->on_close_popup();
+            this->window_initiated = true;
+        }
+
         ImVec2 available = ImGui::GetContentRegionAvail();
         if (this->window_initiated) {
 
-            if (this->movement_lock && ImGui::IsMouseHoveringRect(this->windowposition, ImVec2(this->windowposition.x + 0.25 * available.x, this->windowposition.y + 0.25 * available.y), true)) {
+            if (!this->movement_lock && ImGui::IsMouseHoveringRect(this->windowposition, ImVec2(this->windowposition.x + 0.25 * available.x, this->windowposition.y + 0.25 * available.y), true)) {
                 this->dragging = true;
             }
-            if (this->dragging) {
+            if (this->dragging && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                 this->windowposition.x += ImGui::GetIO().MouseDelta.x;
                 this->windowposition.y += ImGui::GetIO().MouseDelta.y;
             }
@@ -450,15 +474,10 @@ namespace restfulEz {
             }
         }
 
-        ImGui::SetWindowPos(this->windowposition);
+        ImGui::SetNextWindowPos(this->windowposition);
 
         bool to_ret = false;
-        ImGui::BeginChild(this->_ID.data(), ImVec2(0.25 * available.x, 0.25 * available.y), true, ImGuiWindowFlags_ChildWindow);
-        if (!this->window_initiated) {
-            this->windowposition = ImGui::GetCursorPos();
-            this->on_close_popup();
-            this->window_initiated = true;
-        }
+        ImGui::BeginChild(this->_ID.data(), ImVec2(0.25 * default_size.x, 0.25 * default_size.y), true, ImGuiWindowFlags_ChildWindow);
         ImGui::Checkbox("Lock Window", &this->movement_lock);
         ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
         if (!linking) {

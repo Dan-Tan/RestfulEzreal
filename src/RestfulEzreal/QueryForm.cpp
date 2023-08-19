@@ -282,9 +282,20 @@ namespace restfulEz {
         this->sender->add_request(new_task);
         this->form_execute = true;
     }
+    template<std::size_t N>
+    ImVec2 LinkedForm<N>::default_size = ImVec2(0, 0);
 
     void BatchForm::render_form() {
         this->newFormButton();
+        if (this->first_iter) {
+            this->first_iter = false;
+            ImVec2 new_size = ImGui::GetContentRegionAvail();
+            LinkedForm<1>::set_default_size(new_size);
+            LinkedForm<2>::set_default_size(new_size);
+            LinkedForm<3>::set_default_size(new_size);
+            LinkedForm<4>::set_default_size(new_size);
+            LinkedForm<5>::set_default_size(new_size);
+        }
         if (this->linking_mode) {
             for (std::shared_ptr<LinkedInterface>& form : this->forms) {
                 if (form->render_form(true)) {
