@@ -75,19 +75,6 @@ namespace restfulEz {
         this->_endpoint_method_ind = endpoint_method_ind;
     };
 
-    QUERY_FORM::QUERY_FORM(const std::size_t n_params, const int game_ind, const int endpoint_ind, const int endpoint_method_ind, const char* game_name, 
-            const char* endpoint, const char* endpoint_method, 
-            std::vector<P_NAME> param_names, std::vector<ImGuiInputTextFlags> type_ordering,
-            bool accepts_optional, std::vector<P_NAME> optional_names, 
-            std::vector<PARAM_CONT> optional_inputs, std::vector<ImGuiInputTextFlags> optional_types) 
-        : BaseForm(
-                n_params, game_ind, endpoint_ind, endpoint_method_ind, 
-                game_name, endpoint, endpoint_method, 
-                param_names, type_ordering, 
-                accepts_optional, optional_names, 
-                optional_inputs, optional_types
-        ) {};
-
     void QUERY_FORM::render_title() {
         ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
     }
@@ -124,9 +111,6 @@ namespace restfulEz {
             }
         }
         this->form_height = ImGui::GetCursorPosY();
-        if (this->recalculate_height) {
-            this->recalculate_height = false;
-        }
         ImGui::EndChild();
     };	
 
@@ -209,7 +193,6 @@ namespace restfulEz {
                 this->_optionals_to_send[i] = 0;
                 this->_n_used_optional_p1 -= 1;
                 opt_index = i;
-                this->recalculate_height = true;
             };
         }
 
@@ -253,7 +236,6 @@ namespace restfulEz {
             if (this->_optionals_to_send[opt_index] == 0) {this->_n_used_optional_p1 += 1;};
             this->_optionals_to_send[opt_index] = 1;
             opt_index = find_next_focus(this->_optionals_to_send);
-            this->recalculate_height = true;
         }
 
     }
@@ -300,12 +282,17 @@ namespace restfulEz {
             for (std::shared_ptr<LinkedInterface>& form : this->forms) {
                 if (form->render_form(true)) {
                     this->parent = form;
+                    this->child->insert_parent(form);
+                    form->insert_child(this->child);
+                    this->child->configure();
+                    this->linking_mode = false;
                 };
             }
         } else {
             for (std::shared_ptr<LinkedInterface>& form : this->forms) {
                 if (form->render_form()) {
                     this->child = form;
+                    this->linking_mode = true;
                 };
             }
         }
@@ -440,5 +427,19 @@ namespace restfulEz {
         this->forms.back()->set_id(this->current_ID);
         this->current_ID++;
     }
+    
+    void BatchForm::construct_request() {
+    }
 
+    void BatchForm::execute_request() {
+        bool ready = true;
+        for (const auto& form : this->forms) {
+            ready &= form->check_ready();
+        }
+        if (!ready) {
+            // ot all the forms are ready to be executed
+            // DO SOMETHING HERE TO NOT THE USER
+            return;
+        }
+    }
 }

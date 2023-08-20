@@ -4,6 +4,8 @@
 #include "Walnut/Application.h"
 #include "BatchRequests.h"
 #include "RequestQueue.h"
+#include <ranges>
+#include <bits/utility.h>
 #include <iterator>
 #include <vector>
 #include <string>
@@ -74,23 +76,15 @@ namespace restfulEz {
 
         public:
             QUERY_FORM(const BaseForm& copy) : BaseForm(copy) {};
-            QUERY_FORM(const std::size_t n_params, const int game_ind, const int endpoint_ind, 
-                    const int endpoint_method_ind, const char* game_name, 
-                    const char* endpoint, const char* endpoint_method, 
-                    std::vector<P_NAME> param_names, std::vector<ImGuiInputTextFlags> type_ordering,
-                    bool accepts_optional = false, std::vector<P_NAME> optional_names = {}, 
-                    std::vector<PARAM_CONT> optional_inputs = {}, std::vector<ImGuiInputTextFlags> optional_types = {});
             ~QUERY_FORM() = default;
+
             void set_id(int new_id) {
                 this->_ID = std::string("##FORM") + std::to_string(new_id);
             }
 
-            static QUERY_FORM make_form(const int game_ind, const int endpoint_ind, const int endpoint_method_ind); 
-
             void set_sender(std::shared_ptr<RequestSender> sender_client) {this->sender = sender_client;}
             void render_form();
             bool check_remove() { return this->remove_form; };
-            void calc_height() {this->recalculate_height = true;}
 
             bool operator==(const QUERY_FORM& other_form);
 
@@ -101,15 +95,9 @@ namespace restfulEz {
             void render_singular_field(const int i, bool already_sent);
             request construct_request();
             const std::string& get_ID() {return this->_ID;};
-            bool recalculate_height = true;
             float form_height = 0.0f;
 
         private:
-            static QUERY_FORM make_form_LOL(const int endpoint_ind, const int endpoint_method_ind); 
-            static QUERY_FORM make_form_TFT(const int endpoint_ind, const int endpoint_method_ind); 
-            static QUERY_FORM make_form_VAL(const int endpoint_ind, const int endpoint_method_ind); 
-            static QUERY_FORM make_form_LOR(const int endpoint_ind, const int endpoint_method_ind); 
-
             virtual void render_required(bool already_sent);
             virtual void render_optionals(bool already_sent);
             void submit_request();
@@ -121,11 +109,18 @@ namespace restfulEz {
             virtual bool render_form(bool linking = false) = 0;
             virtual void set_id(int i) = 0;
 
-            //virtual void insert_parent(std::shared_ptr<LinkedInterface> child) = 0;
-            //virtual void insert_child(std::shared_ptr<LinkedInterface> parent) = 0;
+            virtual void configure() = 0;
+            virtual bool check_ready() const = 0;
+            virtual bool check_iterative() = 0;
 
-            //virtual bool delete_parent(std::shared_ptr<LinkedInterface> parent) = 0;
-            //virtual bool delete_child(std::shared_ptr<LinkedInterface> child) = 0;
+            virtual void construct_base() = 0;
+            virtual void link_final_requests() = 0;
+
+            virtual void insert_parent(std::shared_ptr<LinkedInterface> child) = 0;
+            virtual void insert_child(std::shared_ptr<LinkedInterface> parent) = 0;
+
+            virtual void delete_parent(LinkedInterface* parent) = 0;
+            virtual void delete_child(LinkedInterface* child) = 0;
 
             static std::shared_ptr<LinkedInterface> make_linked(const int game, const int endpoint, const int endpoint_method);
 
@@ -141,16 +136,17 @@ namespace restfulEz {
         private:
             // should consider switching to a friendly container class to handle request contants and the owner handles rendering
             ImVec2 windowposition;
+            float window_height = LinkedForm<N>::default_size.y;
             bool movement_lock = false;
             bool dragging = false;
             bool window_initiated  = false;
             // should be the number of parameters - 1
-            std::array<LinkedForm*, N-1> parents;
+            std::array<std::shared_ptr<LinkedInterface>, N-1> parents;
             std::array<std::shared_ptr<iter_access_info>, N-1> iter_info;
             std::array<char[8], N-1> iter_limits;
             std::vector<std::string> display_form;
 
-            std::vector<LinkedForm*> children; // variables size
+            std::vector<std::shared_ptr<LinkedInterface>> children; // variables size
 
             bool linked[N] = { 0 };
             bool iterative[N] = { 0 };
@@ -159,35 +155,37 @@ namespace restfulEz {
 
             // let user know if the form is finished
             bool ready = false;
-            
+
             bool linking = false;
             std::size_t next_index = -1;
 
+            std::string popup_id;
+            
+            bool req_iterative = false;
+            std::shared_ptr<LinkedRequest> base_request = nullptr;
+
         public:
             LinkedForm() {};
-            LinkedForm(const BaseForm& copy) : BaseForm(copy) {
-                this->parents.fill(nullptr);
-                for (int i = 0; i < N-1; i++) {
-                    this->display_form.emplace_back("");
-                    this->iter_info[i] = std::make_shared<iter_access_info>();
-                }
-                this->display_form.emplace_back("");
-            };
-            bool render_form(bool linking = false) override;
-            void set_id(int new_id) override {
-                this->_ID = std::string("##FORM") + std::to_string(new_id);
-            }
-            static void set_default_size(ImVec2 new_size) {
-                // static member
-                LinkedForm::default_size = new_size;
-            }
-            static ImVec2 default_size;
-            
-            //void insert_parent(std::shared_ptr<LinkedInterface> child) override;
-            //void insert_child(std::shared_ptr<LinkedInterface> parent) override;
+            LinkedForm(const BaseForm& copy);
 
-            //bool delete_parent(std::shared_ptr<LinkedInterface> parent) override;
-            //bool delete_child(std::shared_ptr<LinkedInterface> child) override;
+            bool render_form(bool linking = false) override;
+            void configure() override {this->configuring = true;}
+            
+            void insert_parent(std::shared_ptr<LinkedInterface> child) override;
+            void insert_child(std::shared_ptr<LinkedInterface> parent) override;
+
+            void delete_parent(LinkedInterface* parent) override;
+            void delete_child(LinkedInterface* child) override;
+
+            void set_id(int new_id) override {this->_ID = std::string("##FORM") + std::to_string(new_id); this-> popup_id = std::string("Configure Request##FORM") + std::to_string(new_id);};
+            static void set_default_size(ImVec2 new_size) {LinkedForm::default_size = new_size;}
+
+            static ImVec2 default_size;
+
+            bool check_ready() const override {return this->ready;}
+            void construct_base() override;
+            void link_final_requests() override;
+            bool check_iterative();
 
         private:
             bool render_linking();
@@ -195,9 +193,9 @@ namespace restfulEz {
             void display_field(const std::size_t ind) const;
 
             bool render_popup();
-            void render_all_fields();
+            bool render_all_fields();
             void render_routing();
-            void render_field(const std::size_t ind);
+            bool render_field(const std::size_t ind);
             
             // when the user closes the form we want to update certain fields to 
             // to avoid performing calculations on every frame
@@ -235,8 +233,20 @@ namespace restfulEz {
         private:
             void newFormButton();
             void pushNewForm(const int game, const int endpoint, const int endpoint_method);
+            void construct_request();
+            void execute_request();
 
     };
+
+    template<std::size_t N>
+    LinkedForm<N>::LinkedForm(const BaseForm& copy) : BaseForm(copy) {
+        this->parents.fill(nullptr);
+        for (int i = 0; i < N-1; i++) {
+            this->display_form.emplace_back("");
+            this->iter_info[i] = std::make_shared<iter_access_info>();
+        }
+        this->display_form.emplace_back("");
+    }
 
     static inline void render_json_form(std::vector<KEY_CONT>& keys, const int ind, bool second = false) {
         
@@ -290,17 +300,30 @@ namespace restfulEz {
     }
     
     template<std::size_t N>
-    void LinkedForm<N>::render_field(const std::size_t ind) {
+    bool LinkedForm<N>::render_field(const std::size_t ind) {
 
+        // linking option checkboc
+        bool linking = false;
         static char _link_id[] = "Linked##0";
         _link_id[8] = (char)ind;
         ImGui::Checkbox(_link_id, &this->linked[ind]);
-
+        
         static char _iter_id[] = "Iterative##0";
         _iter_id[11] = (char)ind;
         if (this->linked[ind]) {
             ImGui::Checkbox(_iter_id, &this->iterative[ind]);
-
+            if (ImGui::Button("Link Parent")) {
+                this->next_index = ind;
+                linking = true;
+                this->configuring = false;
+            }
+            if (this->parents[ind-1] != nullptr) {
+                ImGui::SameLine();
+                if (ImGui::Button("Unlink Parent")) {
+                    this->parents[ind-1]->delete_child(this);
+                    this->parents[ind-1] = nullptr;
+                }
+            }
             if (this->iterative[ind]) {
                 render_iter_json(this->iter_info[ind-1]->keys, this->iter_info[ind-1]->access_after_iter.keys, this->iter_limits[ind-1], ind);
             } else {
@@ -309,6 +332,7 @@ namespace restfulEz {
         } else {
             ImGui::InputText(this->_param_names[ind].name, this->_params_in_form[ind].param, P_INPUT_LENGTH, this->_type_ordering[ind]);
         }
+        return linking;
     };
 
     template<bool add, std::size_t... Ixs>
@@ -336,7 +360,7 @@ namespace restfulEz {
     bool LinkedForm<N>::validate_field(const std::size_t ind) const {
 
         // check if the field is linked (not a full validation, full validation would require knowledge of the response structure (I'm too lazy))
-        if (this->linked[ind]) { return this->parents[ind-1];
+        if (this->linked[ind]) { return !this->parents[ind-1] ? false : true;
         } else {
             return strlen(this->_params_in_form[ind].param) != 0;
         }
@@ -367,15 +391,15 @@ namespace restfulEz {
         std::stringstream formatted;
         // something like name: (Keys) key1, key2, ,key3, ..., final_key
         formatted << field_name.name << ':' << "(Keys) \n    Before:";
-        for (int i = 0; i < keys.size() - 1; i++) {
-            formatted << keys[i].key << ", ";
+        for (int i = 0; i < keys.size(); i++) {
+            formatted << keys[i].key << " ";
         }
-        formatted << keys[keys.size() - 1].key << ". \n    After";
+        formatted << ". \n    After";
 
-        for (int i = 0; i < keys2.size() - 1; i++) {
-            formatted << keys2[i].key << ", ";
+        for (int i = 0; i < keys2.size(); i++) {
+            formatted << keys2[i].key << " ";
         }
-        formatted << keys2[keys2.size() - 1].key << ". \n    Iteration Limit: " << iter_limit << "\n";
+        formatted << ". \n    Iteration Limit: " << iter_limit << "\n";
 
         if (linked) {
             formatted << "(LINKED)";
@@ -391,10 +415,10 @@ namespace restfulEz {
         std::stringstream formatted;
         // something like name: (Keys) key1, key2, ,key3, ..., final_key
         formatted << field_name.name << ':' << "(Keys) ";
-        for (int i = 0; i < keys.size() - 1; i++) {
-            formatted << keys[i].key << ", ";
+        for (int i = 0; i < keys.size(); i++) {
+            formatted << keys[i].key << " ";
         }
-        formatted << keys[keys.size() - 1].key << ". ";
+        formatted << ". ";
 
         if (linked) {
             formatted << "(LINKED)";
@@ -408,7 +432,7 @@ namespace restfulEz {
 
     template<std::size_t N>
     void LinkedForm<N>::format_field_display(const std::size_t ind) {
-        bool linked_to_parent = this->parents[ind-1];
+        bool linked_to_parent = !this->parents[ind-1] ? false : true;
         if (this->iterative[ind]) {
             this->display_form[ind] = display_iter_keys(this->_param_names[ind], this->iter_info[ind-1]->keys, this->iter_info[ind-1]->access_after_iter.keys, this->iter_limits[ind-1], linked_to_parent);
         } else if (this->linked[ind]) {
@@ -419,34 +443,50 @@ namespace restfulEz {
     }
 
     template<std::size_t N>
-    void LinkedForm<N>::render_all_fields() {
-        for_<true>(static_cast<std::function<void(const std::size_t)>>(std::bind_front(&LinkedForm<N>::render_field, this)), std::make_index_sequence<N-1>{});
+    bool LinkedForm<N>::render_all_fields() {
+        if constexpr (N == 1) {
+            return false;
+        } else {
+            auto check_ret = [this](bool acc, const std::size_t ind){
+                acc = acc || this->render_field(ind);
+                return acc;
+            };
+            std::array<std::size_t, N-1> inds = {0};
+            std::iota(inds.begin(), inds.end(), 1);
+
+            bool link_mode = std::accumulate(inds.begin(), inds.end(), false, check_ret);
+            return link_mode;
+        }
     }
 
     template<std::size_t N>
     bool LinkedForm<N>::render_popup() {
-
-        ImGui::OpenPopup("Configure Request");
+        bool linking = false;
+        ImGui::OpenPopup(this->popup_id.data());
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-        if (ImGui::BeginPopupModal("Configure Request", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ImGui::BeginPopupModal(this->popup_id.data(), NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
             if (ImGui::Button("Close")) {
                 this->on_close_popup();
                 this->configuring = false;
             }
             this->render_routing();
-            this->render_all_fields();
+            linking = this->render_all_fields();
 
             ImGui::EndPopup();
         }
-        return false;
+        return linking;
     }
 
     template<std::size_t N>
     bool LinkedForm<N>::render_linking() {
-        return ImGui::Button("Select");
+        if (ImGui::Button("Select")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     template<std::size_t N>
@@ -477,21 +517,21 @@ namespace restfulEz {
         ImGui::SetNextWindowPos(this->windowposition);
 
         bool to_ret = false;
-        ImGui::BeginChild(this->_ID.data(), ImVec2(0.25 * default_size.x, 0.25 * default_size.y), true, ImGuiWindowFlags_ChildWindow);
-        ImGui::Checkbox("Lock Window", &this->movement_lock);
-        ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
-        if (!linking) {
-            if (this->configuring) {
-                to_ret = this->render_popup();
+        if (ImGui::BeginChild(this->_ID.data(), ImVec2(0.25 * default_size.x, this->window_height), true, ImGuiWindowFlags_ChildWindow)) {;
+            ImGui::Checkbox("Lock Window", &this->movement_lock);
+            ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
+            if (!linking) {
+                if (this->configuring) {
+                    to_ret = this->render_popup();
+                } else {
+                    this->render_summary();
+                }
             } else {
-                this->render_summary();
+                to_ret = this->render_linking();
             }
-        } else {
-            to_ret = this->render_linking();
         }
-
+        this->window_height = ImGui::GetCursorPosY() + ImGui::GetStyle().ItemSpacing.y;
         ImGui::EndChild();
-
         return to_ret;
     }
 
@@ -500,4 +540,94 @@ namespace restfulEz {
         return LinkedForm<N>(copy);
     }
 
+    // [SECTION] Handling connections between forms before execution
+    
+    template<std::size_t N>
+    inline void LinkedForm<N>::insert_child(std::shared_ptr<LinkedInterface> child) {
+        this->children.push_back(child);
+    }
+
+    template<std::size_t N> 
+    void LinkedForm<N>::insert_parent(std::shared_ptr<LinkedInterface> parent) {
+        if (this->next_index == -1) {
+            throw std::logic_error("Trying to insert parent whilst the index has not been set");
+        }
+        this->parents[this->next_index-1] = parent;
+        this->linked[this->next_index] = true;
+        this->next_index == -1;
+    }
+
+    template<std::size_t N>
+    void LinkedForm<N>::delete_child(LinkedInterface* child) {
+        std::vector<int> inds;
+        int counter = 0;
+        for (std::shared_ptr<LinkedInterface>& possible : this->children) {
+            if (possible.get() == child) {
+                inds.push_back(counter);
+            }
+            counter++;
+        }
+        int dels = 0;
+        for (int to_delete : inds) {
+            this->children.erase(this->children.begin() + to_delete - dels);
+            dels++;
+        }
+    }
+
+    template<std::size_t N>
+    void LinkedForm<N>::delete_parent(LinkedInterface* parent) {
+        for (int i = 0; i < N-1; i++) {
+            if (this->parents[i].get() == parent) {this->parents[i] = nullptr;}
+        }
+    }
+
+    // [SECTION] Construction methods
+    
+    template<std::size_t N>
+    bool LinkedForm<N>::check_iterative() {
+        if (this->req_iterative) {
+            // exit early we already know this request is iterative
+            return true;
+        }
+        for (int i = 0; i < N; i++) {
+            this->req_iterative |= iterative;
+        }
+        if (this->req_iterative) {
+            // no need to check parent requests if we already know iterative
+            return true;
+        }
+        for (auto& parent : this->parents) {
+            // a child is iterative if any of its parents are (this will also calculate parent checks to prevent recomputation)
+            this->req_iterative = parent.check_iterative();
+        }
+        return this->req_iterative;
+    }
+
+    template<std::size_t N>
+    void LinkedForm<N>::construct_base() {
+        if (this->check_iterative) {
+            this->base_request = std::make_shared<IterativeRequest>();
+        }
+        // insert nonlinked parameters into base request
+        auto nonlinked = [this](int i) {return this->linked[i];};
+        for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(nonlinked)) {
+            this->base_request->params[i] = this->_params_in_form[i];
+        }
+
+        // insert optional parameters in request
+        for (int i = 0; i < this->_optional_inputs.size(); i++) {
+            if (this->_optionals_to_send[i] == 1) {
+                this->base_request->optional_names[i] = this->_optional_names[i];
+                this->base_request->optional_inputs[i] = this->_optional_inputs[i];
+            } else {
+                this->base_request->optional_names[i] = "";
+                this->base_request->optional_inputs[i] = "";
+            }
+        }
+    }
+
+    template<std::size_t N>
+    void LinkedForm<N>::link_final_requests() {
+        // TODO
+    };
 }
