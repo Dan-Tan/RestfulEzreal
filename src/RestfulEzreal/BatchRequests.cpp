@@ -311,4 +311,14 @@ namespace restfulEz {
         }
         return true;
     }
+
+    BatchRequest::BatchRequest(const std::vector<std::shared_ptr<RequestNode>>& requests) {
+        for (const auto& req : requests) {
+            this->parent_requests->insert(req);
+        }
+    }
+
+    json_access_info iter_access_info::get_base() const {
+        return json_access_info(this->keys);
+    }
 }

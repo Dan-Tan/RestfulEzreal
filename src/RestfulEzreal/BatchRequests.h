@@ -111,7 +111,8 @@ namespace restfulEz {
     typedef struct iter_access_info : json_access_info {
         std::size_t iter_limit = 0; // 0 - iter over all
         json_access_info access_after_iter;
-
+        
+        json_access_info get_base() const;
         std::vector<PARAM_CONT> get_params(std::shared_ptr<Json::Value> response) const; 
         std::vector<PARAM_CONT> get_params(std::vector<std::shared_ptr<Json::Value>> responses) const; 
     } iter_access_info;
@@ -134,12 +135,14 @@ namespace restfulEz {
     typedef struct request_link : public base_link{
         std::vector<json_access_info> link_info;
         bool get_dependencies(std::vector<PARAM_CONT>& to_fill) override;
+        bool get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fill) override {throw std::logic_error("Should not be callws from request link class");};
     } request_link;
     
     // describes the relationship between parent and child request when the child needs to fill a vector of dependencies
     typedef struct iter_request_link : public base_link {
         std::vector<iter_access_info> iter_link_info;
         bool get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fills) override;
+        bool get_dependencies(std::vector<PARAM_CONT>& to_fill) override {throw std::logic_error("Should not be called from iter_request link");};
     } iter_request_link;
 
 
@@ -214,6 +217,8 @@ namespace restfulEz {
             std::size_t length = 0;
          
         public:
+            CLinkedList() = default;
+            ~CLinkedList() = default;
             void insert(std::shared_ptr<RequestNode> to_insert);
             void remove();
             inline bool finished() {return this->current_position == this->end;};
@@ -228,13 +233,13 @@ namespace restfulEz {
 
         private:
             // only the Batch Request should have access to requests
-            std::unique_ptr<CLinkedList> parent_requests; 
+            std::unique_ptr<CLinkedList> parent_requests = std::make_unique<CLinkedList>(); 
             std::shared_ptr<RequestNode> current_results = nullptr;
             std::unique_ptr<LinkedRequest> current_request = nullptr;
 
         public:
-            BatchRequest();
-            ~BatchRequest();
+            BatchRequest(const std::vector<std::shared_ptr<RequestNode>>& requests);
+            ~BatchRequest() = default;
 
             request& get_next();
             bool insert_result(const Json::Value& result);

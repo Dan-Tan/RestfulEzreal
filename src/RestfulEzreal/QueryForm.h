@@ -108,13 +108,17 @@ namespace restfulEz {
         public:
             virtual bool render_form(bool linking = false) = 0;
             virtual void set_id(int i) = 0;
+            virtual const ImVec2 get_window_position() = 0;
 
             virtual void configure() = 0;
             virtual bool check_ready() const = 0;
             virtual bool check_iterative() = 0;
+            virtual bool check_dependent() = 0;
+            virtual void detach_base() = 0;
 
             virtual void construct_base() = 0;
             virtual void link_final_requests() = 0;
+            virtual std::shared_ptr<RequestNode> get_base_request() = 0;
 
             virtual void insert_parent(std::shared_ptr<LinkedInterface> child) = 0;
             virtual void insert_child(std::shared_ptr<LinkedInterface> parent) = 0;
@@ -162,7 +166,7 @@ namespace restfulEz {
             std::string popup_id;
             
             bool req_iterative = false;
-            std::shared_ptr<LinkedRequest> base_request = nullptr;
+            std::shared_ptr<RequestNode> base_request = nullptr;
 
         public:
             LinkedForm() {};
@@ -170,6 +174,7 @@ namespace restfulEz {
 
             bool render_form(bool linking = false) override;
             void configure() override {this->configuring = true;}
+            const ImVec2 get_window_position() override {return this->windowposition;};
             
             void insert_parent(std::shared_ptr<LinkedInterface> child) override;
             void insert_child(std::shared_ptr<LinkedInterface> parent) override;
@@ -186,11 +191,21 @@ namespace restfulEz {
             void construct_base() override;
             void link_final_requests() override;
             bool check_iterative();
+            std::shared_ptr<RequestNode> get_base_request() override {return this->base_request;};
+            bool check_dependent() override {
+                bool dep = false;
+                for (int i = 0; i < N; i++) {
+                    dep |= this->linked[i];
+                }
+                return dep;
+            };
+            void detach_base() override {this->base_request = nullptr;};
 
         private:
             bool render_linking();
             void render_summary();
             void display_field(const std::size_t ind) const;
+            void draw_links();
 
             bool render_popup();
             bool render_all_fields();
@@ -233,10 +248,28 @@ namespace restfulEz {
         private:
             void newFormButton();
             void pushNewForm(const int game, const int endpoint, const int endpoint_method);
-            void construct_request();
+            std::shared_ptr<BatchRequest> construct_request();
             void execute_request();
 
     };
+
+    inline void draw_form_link(const ImVec2& parent_pos, const ImVec2& child_pos, float width, float par_height) {
+        // there is a better solution to avoid less function calls on the render loop but I cant be bothered rn
+        ImVec2 beginning = ImVec2(parent_pos.x + width * 1/2, parent_pos.y + par_height);
+        ImVec2 end = ImVec2(child_pos.x + width * 1/2, child_pos.y);
+        ImVec2 mid_point = ImVec2(0.5 * (beginning.x + end.x), 0.5 * (beginning.y + end.y));
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddBezierQuadratic(beginning, ImVec2(beginning.x, mid_point.y), mid_point, 0xFFFFFFFF, 1.0);
+        draw_list->AddBezierQuadratic(mid_point, ImVec2(end.x, mid_point.y), end, 0xFFFFFFFF, 1.0);
+    }
+
+    template<std::size_t N>
+    void LinkedForm<N>::draw_links() {
+        for (const auto& child : this->children) {
+            draw_form_link(this->windowposition, child->get_window_position(), 0.25 * this->default_size.x, this->window_height);
+        }
+    }
 
     template<std::size_t N>
     LinkedForm<N>::LinkedForm(const BaseForm& copy) : BaseForm(copy) {
@@ -312,6 +345,8 @@ namespace restfulEz {
         _iter_id[11] = (char)ind;
         if (this->linked[ind]) {
             ImGui::Checkbox(_iter_id, &this->iterative[ind]);
+            static char _link_but_id[]  = "Link Parent##0";
+            _link_but_id[13] = (char) ind;
             if (ImGui::Button("Link Parent")) {
                 this->next_index = ind;
                 linking = true;
@@ -516,6 +551,8 @@ namespace restfulEz {
 
         ImGui::SetNextWindowPos(this->windowposition);
 
+        this->draw_links();
+
         bool to_ret = false;
         if (ImGui::BeginChild(this->_ID.data(), ImVec2(0.25 * default_size.x, this->window_height), true, ImGuiWindowFlags_ChildWindow)) {;
             ImGui::Checkbox("Lock Window", &this->movement_lock);
@@ -590,7 +627,7 @@ namespace restfulEz {
             return true;
         }
         for (int i = 0; i < N; i++) {
-            this->req_iterative |= iterative;
+            this->req_iterative |= iterative[i];
         }
         if (this->req_iterative) {
             // no need to check parent requests if we already know iterative
@@ -598,36 +635,102 @@ namespace restfulEz {
         }
         for (auto& parent : this->parents) {
             // a child is iterative if any of its parents are (this will also calculate parent checks to prevent recomputation)
-            this->req_iterative = parent.check_iterative();
+            this->req_iterative = parent->check_iterative();
         }
         return this->req_iterative;
     }
 
     template<std::size_t N>
     void LinkedForm<N>::construct_base() {
-        if (this->check_iterative) {
-            this->base_request = std::make_shared<IterativeRequest>();
+        if (this->check_iterative()) {
+            this->base_request = std::make_shared<RequestNode>(std::make_unique<IterativeRequest>());
+        } else {
+            this->base_request = std::make_shared<RequestNode>(std::make_unique<LinkedRequest>());
         }
         // insert nonlinked parameters into base request
         auto nonlinked = [this](int i) {return this->linked[i];};
         for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(nonlinked)) {
-            this->base_request->params[i] = this->_params_in_form[i];
+            this->base_request->_node->unsent_request->params[i] = this->_params_in_form[i];
         }
 
         // insert optional parameters in request
         for (int i = 0; i < this->_optional_inputs.size(); i++) {
             if (this->_optionals_to_send[i] == 1) {
-                this->base_request->optional_names[i] = this->_optional_names[i];
-                this->base_request->optional_inputs[i] = this->_optional_inputs[i];
+                // write better todo
+                this->base_request->_node->unsent_request->optional_names[i] = this->_optional_names[i];
+                this->base_request->_node->unsent_request->optional_inputs[i] = this->_optional_inputs[i];
             } else {
-                this->base_request->optional_names[i] = "";
-                this->base_request->optional_inputs[i] = "";
+                this->base_request->_node->unsent_request->optional_names[i] = "";
+                this->base_request->_node->unsent_request->optional_inputs[i] = "";
             }
         }
+    }
+    
+    template<typename Derived, typename Base>
+    std::unique_ptr<Derived> dynamic_ptr_cast(std::unique_ptr<Base>&& base) noexcept {
+            if (auto derived = dynamic_cast<Derived*>(base.release())) {
+                    return std::unique_ptr<Derived>(derived);
+            }
+            return nullptr;
+    }
+
+    inline void insert_link_iter(std::shared_ptr<RequestNode> current, std::shared_ptr<LinkedInterface> parent, const iter_access_info& lnk_info, const int ind) {
+        std::unique_ptr<IterativeRequest> child_node = dynamic_ptr_cast<IterativeRequest>(std::move(current->_node->unsent_request));
+        if (!child_node) {
+            throw std::logic_error("Inserting iterative link for non-iterative field");
+        }
+        child_node->param_indices.push_back(ind);
+
+        // check if parent was aready inserted
+        for (auto& lnk : child_node->iter_dependencies) {
+            if (lnk.parent == parent->get_base_request()) {
+                lnk.iter_link_info.push_back(lnk_info);
+                current->_node->unsent_request = std::move(child_node);
+                return;
+            }
+        }
+        // insert new link didn't find existing with same parent
+        child_node->iter_dependencies.push_back({});
+        child_node->iter_dependencies.back().parent = parent->get_base_request();
+        child_node->iter_dependencies.back().iter_link_info.push_back(lnk_info);
+        current->_node->unsent_request = std::move(child_node);
+        return;
+    }
+
+    inline void insert_link(std::shared_ptr<RequestNode> current, std::shared_ptr<LinkedInterface> parent, const json_access_info &lnk_info, const int ind) {
+        std::unique_ptr<LinkedRequest> child_node = dynamic_ptr_cast<LinkedRequest>(std::move(current->_node->unsent_request));
+        if (!child_node) {
+            throw std::logic_error("Inserting iterative link for non-iterative field");
+        }
+        // check if parent was aready inserted
+        for (auto& lnk : child_node->dependencies) {
+            if (lnk.parent == parent->get_base_request()) {
+                lnk.link_info.push_back(lnk_info);
+                lnk.param_indices.push_back(ind);
+                current->_node->unsent_request = std::move(child_node);
+                return;
+            }
+        }
+        child_node->dependencies.push_back({});
+        child_node->dependencies.back().parent = parent->get_base_request();
+        child_node->dependencies.back().link_info.push_back(lnk_info);
+        child_node->dependencies.back().param_indices.push_back(ind);
+        current->_node->unsent_request = std::move(child_node);
+        return;
+
     }
 
     template<std::size_t N>
     void LinkedForm<N>::link_final_requests() {
-        // TODO
+        auto iter_fl = [this](int i){return this->iterative[i];};
+        for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(iter_fl)) {
+            this->iter_info[i]->iter_limit = std::atoi(this->iter_limits[i]);
+            insert_link(this->base_request, this->parents[i], *this->iter_info[i], i);
+        }
+
+        auto link_fl = [this](int i){return this->linked[i] && !this->iterative[i];};
+        for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(iter_fl)) {
+            insert_link(this->base_request, this->parents[i], this->iter_info[i]->get_base(), i);
+        }
     };
 }

@@ -428,7 +428,26 @@ namespace restfulEz {
         this->current_ID++;
     }
     
-    void BatchForm::construct_request() {
+    std::shared_ptr<BatchRequest> BatchForm::construct_request() {
+        for (auto& form : this->forms) {
+            form->construct_base();
+        }
+
+        for (auto& form : this->forms) {
+            form->link_final_requests();
+        }
+
+        std::vector<std::shared_ptr<RequestNode>> initial_requests;
+        std::accumulate(this->forms.begin(), this->forms.end(), initial_requests, 
+                [](std::vector<std::shared_ptr<RequestNode>> acc, std::shared_ptr<LinkedInterface> frm) {
+                    if (!frm->check_dependent()) {
+                        acc.push_back(frm->get_base_request());
+                    }
+                    return acc;
+                }
+                );
+        
+        return std::make_shared<BatchRequest>(initial_requests);
     }
 
     void BatchForm::execute_request() {
@@ -440,6 +459,14 @@ namespace restfulEz {
             // ot all the forms are ready to be executed
             // DO SOMETHING HERE TO NOT THE USER
             return;
+        }
+
+        std::shared_ptr<BatchRequest> final_form = this->construct_request();
+        this->sender->add_batch_request(final_form);
+        
+        // remove forms pointer to original pointer to prevent uses interference during requests
+        for (auto& frm : this->forms) {
+            frm->detach_base();
         }
     }
 }
