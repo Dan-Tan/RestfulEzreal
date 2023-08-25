@@ -2,6 +2,13 @@
 #include <json/value.h>
 #include <stdexcept>
 
+#ifdef DEBUG_MODE
+#include <iostream>
+#define D(x) std::cerr << x <<'\n'
+#else
+#define D(x)  
+#endif
+
 namespace restfulEz {
 
     const Json::Value* json_access_info::index_json(const Json::Value* to_index) const {
@@ -216,8 +223,10 @@ namespace restfulEz {
     }
 
     void CLinkedList::insert(std::shared_ptr<RequestNode> to_insert) {
+        D("Inserting new child");
         this->length++;
         if (!this->beginning) {
+            D("Inserting first node");
             this->beginning = insert_node(this->beginning, to_insert);
 
             this->end = this->beginning;
@@ -225,7 +234,9 @@ namespace restfulEz {
             return;
         }
         if (this->current_position == this->beginning) {
-            this->beginning = insert_node(this->beginning, to_insert);
+            D("Insert new node, clinkedlist was a singleton");
+            this->current_position = insert_node(this->beginning, to_insert);
+            this->beginning = this->current_position->previous;
             return;
         }
 
@@ -238,6 +249,8 @@ namespace restfulEz {
     void CLinkedList::remove() {
         // if I decide to switch to non-circular linked list the conditionals are mostly not required but leave them for now
         // removing the last remaining element
+        D("removing next request");
+        this->length--;
         if (this->beginning == this->end) {
             this->beginning = nullptr;
             this->current_position = nullptr;
@@ -275,21 +288,16 @@ namespace restfulEz {
     request BatchRequest::FINISHED = request(-1, -1, -1);
 
     std::shared_ptr<RequestNode> CLinkedList::get_next() {
+        D("Current CLinkedList size: " << this->length);
         this->current_position = this->current_position->next;
         return this->current_position->node;
     }
 
-    bool BatchRequest::reformat_parents() {
-        bool finished = false;
-        return finished;
-    };
-
     request& BatchRequest::get_next() {
+        // the final request will remove itself from CLinkedList upon finishing
+        D("Retrieving next request, curent ready request size: " << this->parent_requests->size());
         if (this->parent_requests->finished()) {
-            bool finished = this->reformat_parents(); 
-            if (finished) {
-                return BatchRequest::FINISHED;
-            }
+            return BatchRequest::FINISHED;
         }
         this->current_results = this->parent_requests->get_next();
         this->current_request = this->current_results->send_request();
@@ -297,16 +305,24 @@ namespace restfulEz {
     }
 
     bool BatchRequest::insert_result(const Json::Value& result) {
-        this->current_results->_node->request_results.push_back(std::make_shared<Json::Value>(result));
+        D("Batch Request Receiving result");
+        std::shared_ptr<Json::Value> new_copy =std::make_shared<Json::Value>("");
+        new_copy->copyPayload(result);
+        this->current_results->_node->request_results.push_back(new_copy);
         // if the request has finished we should insert all ready child requests
         if (!this->current_request->update_base()) {
             for (auto& child : this->current_request->children) {
+                D("Checking child");
                 if (child->sent) {
                     throw std::logic_error("Child request somehow executed before parent completion");
                 }
-                this->parent_requests->insert(child);
-                this->parent_requests->remove();
+                if (child->_node->unsent_request->ready()) {
+                    D("Inserting Child: (game: " << child->_node->unsent_request->_game << ", endpoint: " << child->_node->unsent_request->_endpoint << ", endpoint_method: "  << child->_node->unsent_request->_endpoint_method << ")");
+                    this->parent_requests->insert(child);
+                }
             }
+            D("Removing executed request and inserting all ready dependent requests");
+            this->parent_requests->remove();
             return false;
         }
         return true;

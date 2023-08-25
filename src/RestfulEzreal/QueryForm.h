@@ -17,6 +17,13 @@
 #include <numeric>
 #include <string_view>
 
+#ifdef DEBUG_MODE
+#include <iostream>
+#define D(x) std::cerr << x <<'\n'
+#else
+#define D(x)  
+#endif
+
 namespace restfulEz {
 
     class QUERY_FORM;
@@ -190,7 +197,7 @@ namespace restfulEz {
             bool check_ready() const override {return this->ready;}
             void construct_base() override;
             void link_final_requests() override;
-            bool check_iterative();
+            bool check_iterative() override;
             std::shared_ptr<RequestNode> get_base_request() override {return this->base_request;};
             bool check_dependent() override {
                 bool dep = false;
@@ -200,6 +207,8 @@ namespace restfulEz {
                 return dep;
             };
             void detach_base() override {this->base_request = nullptr;};
+
+            std::string rep();
 
         private:
             bool render_linking();
@@ -253,6 +262,31 @@ namespace restfulEz {
 
     };
 
+    template<std::size_t N>
+    std::string LinkedForm<N>::rep() {
+        std::stringstream ss;
+        ss << "From State\n    ";
+        ss << "Linked Fields\n    ";
+        for (int i = 0; i < N; i++) {
+            ss << this->linked[i] ? 1 : 0;
+        }
+        ss << "\nIterative Fields\n    ";
+        for (int i = 0; i < N; i++) {
+            ss << this->iterative[i] ? 1 : 0;
+        }
+        ss << "\nParents\n    ";
+        for (int i = 0; i < N-1; i++) {
+            if (this->parents[i])  {
+                ss << 1;
+            } else {
+                ss << 0;
+            }
+        }
+        
+        ss << "\nNumber of Children: " << this->children.size();
+        return ss.str();
+    }
+
     inline void draw_form_link(const ImVec2& parent_pos, const ImVec2& child_pos, float width, float par_height) {
         // there is a better solution to avoid less function calls on the render loop but I cant be bothered rn
         ImVec2 beginning = ImVec2(parent_pos.x + width * 1/2, parent_pos.y + par_height);
@@ -277,6 +311,10 @@ namespace restfulEz {
         for (int i = 0; i < N-1; i++) {
             this->display_form.emplace_back("");
             this->iter_info[i] = std::make_shared<iter_access_info>();
+        }
+
+        for (int i = 0; i < N-1; i++) {
+            memset(this->iter_limits[i], 0, 8);
         }
         this->display_form.emplace_back("");
     }
@@ -635,7 +673,9 @@ namespace restfulEz {
         }
         for (auto& parent : this->parents) {
             // a child is iterative if any of its parents are (this will also calculate parent checks to prevent recomputation)
-            this->req_iterative = parent->check_iterative();
+            if (parent) {
+                this->req_iterative = parent->check_iterative();
+            }
         }
         return this->req_iterative;
     }
@@ -647,21 +687,23 @@ namespace restfulEz {
         } else {
             this->base_request = std::make_shared<RequestNode>(std::make_unique<LinkedRequest>());
         }
-        // insert nonlinked parameters into base request
-        auto nonlinked = [this](int i) {return this->linked[i];};
-        for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(nonlinked)) {
-            this->base_request->_node->unsent_request->params[i] = this->_params_in_form[i];
+        // insert parameters into base request, linked params will be overwritten eventually
+        for (int i = 0; i < this->_params_in_form.size(); i++) {
+            this->base_request->_node->unsent_request->params.push_back(this->_params_in_form[i]);
         }
+        this->base_request->_node->unsent_request->_game = this->_game_ind;
+        this->base_request->_node->unsent_request->_endpoint = this->_endpoint_ind;
+        this->base_request->_node->unsent_request->_endpoint_method = this->_endpoint_method_ind;
 
         // insert optional parameters in request
         for (int i = 0; i < this->_optional_inputs.size(); i++) {
             if (this->_optionals_to_send[i] == 1) {
                 // write better todo
-                this->base_request->_node->unsent_request->optional_names[i] = this->_optional_names[i];
-                this->base_request->_node->unsent_request->optional_inputs[i] = this->_optional_inputs[i];
+                this->base_request->_node->unsent_request->optional_names.push_back(this->_optional_names[i]);
+                this->base_request->_node->unsent_request->optional_inputs.push_back(this->_optional_inputs[i]);
             } else {
-                this->base_request->_node->unsent_request->optional_names[i] = "";
-                this->base_request->_node->unsent_request->optional_inputs[i] = "";
+                this->base_request->_node->unsent_request->optional_names.push_back("");
+                this->base_request->_node->unsent_request->optional_inputs.push_back("");
             }
         }
     }
@@ -689,6 +731,8 @@ namespace restfulEz {
                 return;
             }
         }
+        D("Adding child request into parent list");
+        parent->get_base_request()->_node->unsent_request->children.push_back(current); // beautiful
         // insert new link didn't find existing with same parent
         child_node->iter_dependencies.push_back({});
         child_node->iter_dependencies.back().parent = parent->get_base_request();
@@ -711,6 +755,8 @@ namespace restfulEz {
                 return;
             }
         }
+        D("Adding child request into parent list");
+        parent->get_base_request()->_node->unsent_request->children.push_back(current); // beautiful
         child_node->dependencies.push_back({});
         child_node->dependencies.back().parent = parent->get_base_request();
         child_node->dependencies.back().link_info.push_back(lnk_info);
@@ -722,15 +768,20 @@ namespace restfulEz {
 
     template<std::size_t N>
     void LinkedForm<N>::link_final_requests() {
+
+        D(static_cast<int>(N) << this->rep());
+
         auto iter_fl = [this](int i){return this->iterative[i];};
         for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(iter_fl)) {
+            D("Inserting iterative linked parent: index" << i);
             this->iter_info[i]->iter_limit = std::atoi(this->iter_limits[i]);
-            insert_link(this->base_request, this->parents[i], *this->iter_info[i], i);
+            insert_link(this->base_request, this->parents[i-1], *this->iter_info[i-1], i-1);
         }
 
         auto link_fl = [this](int i){return this->linked[i] && !this->iterative[i];};
-        for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(iter_fl)) {
-            insert_link(this->base_request, this->parents[i], this->iter_info[i]->get_base(), i);
+        for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(link_fl)) {
+            D("Inserting non itertive linked parent: index" << i);
+            insert_link(this->base_request, this->parents[i-1], this->iter_info[i-1]->get_base(), i-1);
         }
     };
 }

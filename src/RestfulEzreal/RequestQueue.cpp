@@ -1,6 +1,13 @@
 #include "RequestQueue.h"
 #include "BatchRequests.h"
 
+#ifdef DEBUG_MODE
+#include <iostream>
+#define D(x) std::cerr << x <<'\n'
+#else
+#define D(x)  
+#endif
+
 namespace restfulEz {
 
     RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir) {
@@ -118,11 +125,14 @@ namespace restfulEz {
 
         request& next = batch->get_next();
         while (!next.same_endpoint(BatchRequest::FINISHED)) {
+            D("Sending Request (game: " << next._game << ",endpoint: " << next._endpoint << ", method: " << next._endpoint_method << ")");
             this->Send_Request(next);
             while (batch->insert_result(next.response)) {
                 this->Send_Request(next);
             }
             next = batch->get_next();
         }
+
+        D("Batch Request finished executing");
     }
 }

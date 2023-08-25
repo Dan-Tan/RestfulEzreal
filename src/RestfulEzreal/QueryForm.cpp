@@ -269,6 +269,10 @@ namespace restfulEz {
 
     void BatchForm::render_form() {
         this->newFormButton();
+        ImGui::SameLine();
+        if (ImGui::Button("Execute")) {
+            this->execute_request();
+        }
         if (this->first_iter) {
             this->first_iter = false;
             ImVec2 new_size = ImGui::GetContentRegionAvail();
@@ -437,8 +441,7 @@ namespace restfulEz {
             form->link_final_requests();
         }
 
-        std::vector<std::shared_ptr<RequestNode>> initial_requests;
-        std::accumulate(this->forms.begin(), this->forms.end(), initial_requests, 
+        std::vector<std::shared_ptr<RequestNode>> initial_requests = std::accumulate(this->forms.begin(), this->forms.end(), std::vector<std::shared_ptr<RequestNode>>(), 
                 [](std::vector<std::shared_ptr<RequestNode>> acc, std::shared_ptr<LinkedInterface> frm) {
                     if (!frm->check_dependent()) {
                         acc.push_back(frm->get_base_request());

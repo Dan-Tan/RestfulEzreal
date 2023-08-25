@@ -83,17 +83,6 @@ namespace restfulEz {
         
         request() {};
         request(const int game, const int endpoint, const int endpoint_method);
-        request(const request& copy) { // copy constructor
-            this->_game = copy._game;
-            this->_endpoint = copy._endpoint;
-            this->_endpoint_method = copy._endpoint_method;
-
-            this->params = copy.params;
-            this->optional_names = copy.optional_names;
-            this->optional_inputs = copy.optional_inputs;
-
-            this->response = copy.response;
-        };
     } request;
 
     struct LinkedRequest;
@@ -187,9 +176,9 @@ namespace restfulEz {
 
         std::unique_ptr<LinkedRequest> send_request() { // when the request is send remove the unique ptr to the request
             std::unique_ptr<LinkedRequest> to_send = std::move(this->_node->unsent_request);
-            this->_node->request_results = std::vector<std::shared_ptr<Json::Value>>();
-            this->sent =true;
-            return to_send;
+//            this->_node->request_results = {};
+            this->sent = true;
+            return std::move(to_send);
         };
         ~RequestNode() {
             // manually deallocate if the request was never sent
@@ -221,7 +210,7 @@ namespace restfulEz {
             ~CLinkedList() = default;
             void insert(std::shared_ptr<RequestNode> to_insert);
             void remove();
-            inline bool finished() {return this->current_position == this->end;};
+            inline bool finished() {return this->length == 0;};
             std::shared_ptr<RequestNode> get_next();
 
             std::size_t size() const {return this->length;};
