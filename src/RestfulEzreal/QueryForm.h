@@ -265,7 +265,10 @@ namespace restfulEz {
     template<std::size_t N>
     std::string LinkedForm<N>::rep() {
         std::stringstream ss;
-        ss << "From State\n    ";
+        ss << "GAME: " << this->_game_ind << "\n";
+        ss << "ENDPOINT: " << this->_endpoint_ind << "\n";
+        ss << "END_METHOD: " << this->_endpoint_method_ind << "\n";
+        ss << "From State\n";
         ss << "Linked Fields\n    ";
         for (int i = 0; i < N; i++) {
             ss << this->linked[i] ? 1 : 0;
@@ -682,9 +685,13 @@ namespace restfulEz {
 
     template<std::size_t N>
     void LinkedForm<N>::construct_base() {
+        D("Constructing base request from form");
+        D(this->rep());
         if (this->check_iterative()) {
+            D("Iterative");
             this->base_request = std::make_shared<RequestNode>(std::make_unique<IterativeRequest>());
         } else {
+            D("Not iterative");
             this->base_request = std::make_shared<RequestNode>(std::make_unique<LinkedRequest>());
         }
         // insert parameters into base request, linked params will be overwritten eventually
@@ -774,14 +781,14 @@ namespace restfulEz {
         auto iter_fl = [this](int i){return this->iterative[i];};
         for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(iter_fl)) {
             D("Inserting iterative linked parent: index" << i);
-            this->iter_info[i]->iter_limit = std::atoi(this->iter_limits[i]);
-            insert_link(this->base_request, this->parents[i-1], *this->iter_info[i-1], i-1);
+            this->iter_info[i-1]->iter_limit = std::atoi(this->iter_limits[i-1]);
+            insert_link_iter(this->base_request, this->parents[i-1], *this->iter_info[i-1], i);
         }
 
         auto link_fl = [this](int i){return this->linked[i] && !this->iterative[i];};
         for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(link_fl)) {
             D("Inserting non itertive linked parent: index" << i);
-            insert_link(this->base_request, this->parents[i-1], this->iter_info[i-1]->get_base(), i-1);
+            insert_link(this->base_request, this->parents[i-1], this->iter_info[i-1]->get_base(), i);
         }
     };
 }

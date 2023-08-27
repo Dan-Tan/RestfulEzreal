@@ -71,8 +71,6 @@ namespace restfulEz {
         std::vector<P_NAME> optional_names;
         std::vector<PARAM_CONT> optional_inputs;
 
-        Json::Value response;
-
         bool same_endpoint(const request& other) {
             bool same = true;
             same &= this->_game == other._game;
@@ -83,6 +81,7 @@ namespace restfulEz {
         
         request() {};
         request(const int game, const int endpoint, const int endpoint_method);
+        request(const int game, const int endpoint, const int endpoint_method, const std::vector<PARAM_CONT>& pars, const std::vector<P_NAME>& opt_names, const std::vector<PARAM_CONT>& opt_inputs);
     } request;
 
     struct LinkedRequest;
@@ -124,7 +123,7 @@ namespace restfulEz {
     typedef struct request_link : public base_link{
         std::vector<json_access_info> link_info;
         bool get_dependencies(std::vector<PARAM_CONT>& to_fill) override;
-        bool get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fill) override {throw std::logic_error("Should not be callws from request link class");};
+        bool get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fill) override;
     } request_link;
     
     // describes the relationship between parent and child request when the child needs to fill a vector of dependencies
@@ -139,13 +138,19 @@ namespace restfulEz {
     // TOP LEVEL INDIVIDUAL LINKED REQUEST STRUCTURE 
 
     typedef struct LinkedRequest : request {
+        virtual ~LinkedRequest() = default;
         std::vector<request_link> dependencies;
         std::vector<std::shared_ptr<RequestNode>> children;
 
-        bool fill_request();
+        virtual bool fill_request();
         // Non-iterative requests only send one request so when asked to update they will respond with completed
         virtual bool update_base() {return false;}
         virtual bool ready();
+
+        request get_base_copy();
+
+        protected:
+            bool fill_req_priv();    
     } LinkedRequest;
 
     typedef struct IterativeRequest : LinkedRequest {
@@ -156,7 +161,7 @@ namespace restfulEz {
         // response false when the Iterative request has been completed
         bool update_base() override;
         bool ready() override;
-        bool iter_fill_request();
+        bool fill_request() override;
 
         std::vector<std::size_t> progress;
     } IterativeRequest;
@@ -165,6 +170,7 @@ namespace restfulEz {
         std::unique_ptr<LinkedRequest> unsent_request;
         std::vector<std::shared_ptr<Json::Value>> request_results;
         ReqNode(std::unique_ptr<LinkedRequest> unsent) : unsent_request(std::move(unsent)) {};
+        ReqNode(std::vector<std::shared_ptr<Json::Value>> results) : request_results(results) {};
         ~ReqNode() {};
     } ReqNode;
     
@@ -174,16 +180,13 @@ namespace restfulEz {
         std::unique_ptr<ReqNode> _node;
         RequestNode(std::unique_ptr<LinkedRequest> unsent) : _node(std::make_unique<ReqNode>(std::move(unsent))) {};
 
-        std::unique_ptr<LinkedRequest> send_request() { // when the request is send remove the unique ptr to the request
-            std::unique_ptr<LinkedRequest> to_send = std::move(this->_node->unsent_request);
-//            this->_node->request_results = {};
-            this->sent = true;
-            return std::move(to_send);
-        };
+        std::unique_ptr<LinkedRequest> send_request();
         ~RequestNode() {
             // manually deallocate if the request was never sent
             if (!this->sent) {
                 this->_node->unsent_request.reset();
+            } else {
+                this->_node->request_results.clear();
             }
         }
     } RequestNode;
@@ -230,8 +233,9 @@ namespace restfulEz {
             BatchRequest(const std::vector<std::shared_ptr<RequestNode>>& requests);
             ~BatchRequest() = default;
 
-            request& get_next();
-            bool insert_result(const Json::Value& result);
+            request get_next();
+            request get_current();
+            bool insert_result(std::shared_ptr<Json::Value> result);
             // request returned when the batch request is finished
             static request FINISHED;
 

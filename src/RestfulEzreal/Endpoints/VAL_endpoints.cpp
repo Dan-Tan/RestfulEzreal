@@ -90,8 +90,8 @@ namespace restfulEz {
         throw std::invalid_argument("Invalid Endpoint Index");
     }
 
-    void RequestSender::Send_VAL(request& task) {
-        Json::Value response;
+    std::shared_ptr<Json::Value> RequestSender::Send_VAL(request& task) {
+        std::shared_ptr<Json::Value> response;
 
         std::vector<PARAM_CONT>& params = task.params;
         std::vector<P_NAME>& opt_names = task.optional_names;
@@ -101,24 +101,25 @@ namespace restfulEz {
 
         switch (endpoint) {
             case CONTENT:
-                task.response = this->underlying_client->Val_Content.content(params.at(0), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
+                response = std::make_shared<Json::Value>(this->underlying_client->Val_Content.content(params.at(0), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0))));break;
             case MATCH:
                 switch (endpoint_method) {
                     case BY_MATCH:
-                        task.response = this->underlying_client->Val_Match.by_match(params.at(0), params.at(1));break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Val_Match.by_match(params.at(0), params.at(1)));break;
                     case BY_PUUID:
-                        task.response = this->underlying_client->Val_Match.by_puuid(params.at(0), params.at(1));break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Val_Match.by_puuid(params.at(0), params.at(1)));break;
                     case BY_QUEUE:
-                        task.response = this->underlying_client->Val_Match.by_queue(params.at(0), params.at(1));break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Val_Match.by_queue(params.at(0), params.at(1)));break;
                     default:
                         throw std::invalid_argument("Invalid Endpoint Method Index Given");
                 } break;
             case RANKED:
-                task.response = this->underlying_client->Val_Ranked.by_act(params.at(0), params.at(1), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
+                response = std::make_shared<Json::Value>(this->underlying_client->Val_Ranked.by_act(params.at(0), params.at(1), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0))));break;
             case STATUS:
-                task.response = this->underlying_client->Val_Status.platform_data(params.at(0));break;
+                response = std::make_shared<Json::Value>(this->underlying_client->Val_Status.platform_data(params.at(0)));break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index Given");
         }
+        return response;
     }
 }

@@ -30,17 +30,17 @@ namespace restfulEz {
         if (!response->isArray()) {
             throw std::runtime_error("Invalid sequence of keys, Json is not array and cannot be iterated through");
         }
-        std::size_t counter = 0;
-        for (auto& json :*response) {
-             
-            if (counter >= iter_limit) {break;}
+        for (int i = 0; i < response->size(); i++) {
 
-            access = &json;
+            if (i >= iter_limit && iter_limit != 0) {
+                break;
+            }
+
+            access = &(*response)[i];
             for (auto& key : keys) {
                 access = &(*access)[key.key]; // not very nice
             }
             to_add.push_back((*access).asCString());
-            counter++;
         }
     }
 
@@ -96,10 +96,8 @@ namespace restfulEz {
 
     bool iter_request_link::get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fill) {
         try {
-            std::size_t counter = 0;
             for (iter_access_info& iter_link : this->iter_link_info) {
-                to_fill[this->param_indices[counter]] = iter_link.get_params(this->parent->_node->request_results);
-                counter++;
+                to_fill.push_back(iter_link.get_params(this->parent->_node->request_results));
             }
             return true;
         }
@@ -114,21 +112,7 @@ namespace restfulEz {
     }
 
     bool LinkedRequest::fill_request() {
-        try {
-            bool success = true;
-            for (request_link& link : this->dependencies) {
-                success &= link.get_dependencies(this->params);
-            }
-            return success;
-        }
-        catch (std::runtime_error &ex) {
-            // user invalid json access key
-            return false;
-        }
-        catch (std::out_of_range &ex) {
-            // parent request has not been sent yet!!!
-            return false;
-        }
+        return this->fill_req_priv();
     }
 
     bool LinkedRequest::ready() {
@@ -150,11 +134,62 @@ namespace restfulEz {
         return ready;
     }
 
-    bool IterativeRequest::iter_fill_request() {
+    bool LinkedRequest::fill_req_priv() {
         try {
-
-            this->fill_request();
             bool success = true;
+            for (request_link& link : this->dependencies) {
+                success &= link.get_dependencies(this->params);
+            }
+            return success;
+        }
+        catch (std::runtime_error &ex) {
+            // user invalid json access key
+            return false;
+        }
+        catch (std::out_of_range &ex) {
+            // parent request has not been sent yet!!!
+            return false;
+        }
+    }
+
+    bool request_link::get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fill) {
+        try {
+            std::size_t counter = 0;
+            for (json_access_info& noniter_link : this->link_info) {
+                to_fill.push_back({});
+                for (std::shared_ptr<Json::Value> res : this->parent->_node->request_results) {
+                    to_fill.back().push_back(noniter_link.get_param(res));
+                }
+                counter++;
+            }
+            return true;
+        }
+        catch (std::out_of_range &ex) {
+            throw std::out_of_range((std::string("Improper construction of links and dependencies, check construction")+ std::string(ex.what())).c_str());
+        }
+        catch(std::runtime_error &ex) {
+            // user passed invalid json keys
+            return false;
+        }
+    }
+
+    bool IterativeRequest::fill_request() {
+        try {
+            bool success = true;
+            D("Filling Dependencies in iterative request");
+            D("#Non-iterative links: " << this->dependencies.size());
+            D("#Iterative links    : " << this->iter_dependencies.size());
+            for (request_link& noniter_link : this->dependencies) {
+                // if a parent was iterative we treat the link as iterative but access the params in a non iterative manner;
+                if (noniter_link.parent->_node->request_results.size() == 1) {
+                    D("Regular non-iterative link");
+                    success &= noniter_link.get_dependencies(this->params);
+                } else {
+                    D("Iterative non-iterative link");
+                    success &= noniter_link.get_dependencies(this->param_fields);
+                    this->param_indices.insert(this->param_indices.end(), noniter_link.param_indices.begin(), noniter_link.param_indices.end());
+                }
+            }
             for (iter_request_link& iter_link : this->iter_dependencies) {
                 success &= iter_link.get_dependencies(this->param_fields); 
             }
@@ -173,6 +208,10 @@ namespace restfulEz {
 
     bool IterativeRequest::update_base() {
         // create vector filled with 0 if not alreay done
+        D("Updating Base for iterative request");
+        D("Param index size: " << this->param_indices.size());
+        D("Iterative param fields size: " << this->param_fields.size());
+        D("Param size: " << this->params.size());
         if (progress.size() == 0) {
             for (const auto& dep_field :this->param_fields) {
                 this->progress.push_back(0);
@@ -262,6 +301,7 @@ namespace restfulEz {
         if (this->end == this->current_position) {
             this->end = this->current_position->previous;
             this->end->next = this->beginning;
+            this->current_position = this->end;
             return;
         }
         // remove beginning element
@@ -279,6 +319,25 @@ namespace restfulEz {
         this->current_position = this->current_position->next;
     }
 
+    request::request(const int game, const int endpoint, const int endpoint_method, const std::vector<PARAM_CONT>& pars, const std::vector<P_NAME>& opt_names, const std::vector<PARAM_CONT>& opt_inputs) {
+        this->_game = game;
+        this->_endpoint = endpoint;
+        this->_endpoint_method = endpoint_method;
+        this->params = pars;
+        this->optional_names = opt_names;
+        this->optional_inputs = opt_inputs;
+    }
+
+    request LinkedRequest::get_base_copy() {
+        D("Constructing copy to send");
+        D("(Game|Endpoint|EndpointMethod): " << this->_game << this->_endpoint << this->_endpoint_method);
+        for (auto& par : this->params) {
+            D(par.param);
+        }
+        request new_req = {this->_game, this->_endpoint, this->_endpoint_method, this->params, this->optional_names, this->optional_inputs};
+        return new_req;
+    }
+
     request::request(const int game, const int endpoint, const int endpoint_method) {
         this->_game = game;
         this->_endpoint = endpoint;
@@ -293,7 +352,18 @@ namespace restfulEz {
         return this->current_position->node;
     }
 
-    request& BatchRequest::get_next() {
+    std::unique_ptr<LinkedRequest> RequestNode::send_request() {
+        std::unique_ptr<LinkedRequest> to_send = std::move(this->_node->unsent_request);
+        this->_node = std::make_unique<ReqNode>(std::vector<std::shared_ptr<Json::Value>>());
+        this->sent = true;
+        return to_send;
+    };
+
+    request BatchRequest::get_current() {
+        return this->current_request->get_base_copy();
+    }
+
+    request BatchRequest::get_next() {
         // the final request will remove itself from CLinkedList upon finishing
         D("Retrieving next request, curent ready request size: " << this->parent_requests->size());
         if (this->parent_requests->finished()) {
@@ -301,14 +371,13 @@ namespace restfulEz {
         }
         this->current_results = this->parent_requests->get_next();
         this->current_request = this->current_results->send_request();
-        return *current_request;
+        return this->current_request->get_base_copy();
     }
 
-    bool BatchRequest::insert_result(const Json::Value& result) {
+    bool BatchRequest::insert_result(std::shared_ptr<Json::Value> result) {
         D("Batch Request Receiving result");
-        std::shared_ptr<Json::Value> new_copy =std::make_shared<Json::Value>("");
-        new_copy->copyPayload(result);
-        this->current_results->_node->request_results.push_back(new_copy);
+        D("Json::Value vector length" << this->current_results->_node->request_results.size());
+        this->current_results->_node->request_results.push_back(result);
         // if the request has finished we should insert all ready child requests
         if (!this->current_request->update_base()) {
             for (auto& child : this->current_request->children) {
@@ -318,6 +387,8 @@ namespace restfulEz {
                 }
                 if (child->_node->unsent_request->ready()) {
                     D("Inserting Child: (game: " << child->_node->unsent_request->_game << ", endpoint: " << child->_node->unsent_request->_endpoint << ", endpoint_method: "  << child->_node->unsent_request->_endpoint_method << ")");
+                    child->_node->unsent_request->fill_request();
+                    child->_node->unsent_request->update_base();
                     this->parent_requests->insert(child);
                 }
             }

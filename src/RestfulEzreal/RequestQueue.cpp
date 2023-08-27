@@ -1,5 +1,6 @@
 #include "RequestQueue.h"
 #include "BatchRequests.h"
+#include <stdexcept>
 
 #ifdef DEBUG_MODE
 #include <iostream>
@@ -64,44 +65,48 @@ namespace restfulEz {
         }
     }
 
-    void RequestSender::Send_Request(request& task) {
+    std::shared_ptr<Json::Value> RequestSender::Send_Request(request& task) {
+        std::shared_ptr<Json::Value> response;
         switch (task._game) {
             case 0: // RIOT
-                this->Send_Riot(task); break;
+                response = this->Send_Riot(task); break;
             case 1: // LEAGUE OF LEGENDS
-                this->Send_LOL(task); break;
+                response = this->Send_LOL(task); break;
             case 2: // TEAMFIGHT TACTICS
-                this->Send_TFT(task); break;
+                response = this->Send_TFT(task); break;
             case 3: // VALORANT
-                this->Send_VAL(task); break;
+                response = this->Send_VAL(task); break;
             case 4: // LEGENDS OF RUNETERR
-                this->Send_LOR(task); break;
+                response = this->Send_LOR(task); break;
             default:
                 throw std::invalid_argument("Invalid Game Index");
         }
-        this->write_response_file(task);
+        this->write_response_file(task, response);
+        return response;
     }
 
-    void RequestSender::Send_Riot(request& task) {
+    std::shared_ptr<Json::Value> RequestSender::Send_Riot(request& task) {
         std::vector<PARAM_CONT> & params = task.params;
 
         switch (task._endpoint_method) {
             case 0:
-                task.response = this->underlying_client->Account.by_puuid(params.at(0), params.at(1)); break;
+                return std::make_shared<Json::Value>(this->underlying_client->Account.by_puuid(params.at(0), params.at(1))); break;
             case 1:
-                task.response = this->underlying_client->Account.by_riot_id(params.at(0), params.at(1), params.at(2)); break;
+                return std::make_shared<Json::Value>(this->underlying_client->Account.by_riot_id(params.at(0), params.at(1), params.at(2))); break;
             case 2:
-                task.response = this->underlying_client->Account.by_game(params.at(0), params.at(1), params.at(2)); break;
+                return std::make_shared<Json::Value>(this->underlying_client->Account.by_game(params.at(0), params.at(1), params.at(2))); break;
+            default:
+                throw std::invalid_argument("Given ivnalid endpoint method index for Riot Accout endpoint");
         }
     }
 
-    void RequestSender::write_response_file(const request& task) {
+    void RequestSender::write_response_file(const request& task, std::shared_ptr<Json::Value> result) {
         // write more informative file names
         const int game = task._game;
         const int endpoint = task._endpoint;
         const int endpoint_method = task._endpoint_method;
 
-        const Json::Value& response = task.response;
+        const Json::Value& response = *result;
 
         static int counter = 0; // change as well
 
@@ -122,12 +127,14 @@ namespace restfulEz {
 
         // assume all tasks in the linked are ready to execute
         bool not_finished = true;
+        std::shared_ptr<Json::Value> result;
 
-        request& next = batch->get_next();
+        request next = batch->get_next();
         while (!next.same_endpoint(BatchRequest::FINISHED)) {
             D("Sending Request (game: " << next._game << ",endpoint: " << next._endpoint << ", method: " << next._endpoint_method << ")");
-            this->Send_Request(next);
-            while (batch->insert_result(next.response)) {
+            result = this->Send_Request(next);
+            while (batch->insert_result(result)) {
+                next = batch->get_current();
                 this->Send_Request(next);
             }
             next = batch->get_next();

@@ -286,8 +286,8 @@ namespace restfulEz {
 
     };
 
-    void RequestSender::Send_LOL(request& task) {
-        Json::Value response;
+    std::shared_ptr<Json::Value> RequestSender::Send_LOL(request& task) {
+        std::shared_ptr<Json::Value> response;
 
         std::vector<PARAM_CONT>& params = task.params;
         std::vector<P_NAME>& opt_names = task.optional_names; // WARNING MIGHT NOT BE INITIALISED/EMPTY
@@ -299,104 +299,105 @@ namespace restfulEz {
             case CHAMPION_MASTERY: // Champion Mastery
                 switch (endpoint_method) {
                     case CM_BY_PUUID:
-                        task.response = this->underlying_client->Champion_Mastery.by_summoner_id(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Champion_Mastery.by_summoner_id(params.at(0), params.at(1))); break;
                     case CM_BY_RIOT_ID:
-                        task.response = this->underlying_client->Champion_Mastery.by_summoner_by_champion(params.at(0), params.at(1), atoi(params.at(2))); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Champion_Mastery.by_summoner_by_champion(params.at(0), params.at(1), atoi(params.at(2)))); break;
                     case CM_BY_GAME_BY_PUUID:
-                        task.response = this->underlying_client->Champion_Mastery.by_summoner_top(params.at(0), params.at(1), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Champion_Mastery.by_summoner_top(params.at(0), params.at(1), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))))); break;
                     case CM_SCORE_BY_SUMMONER:
-                        task.response = this->underlying_client->Champion_Mastery.scores_by_summoner(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Champion_Mastery.scores_by_summoner(params.at(0), params.at(1))); break;
                 } break;
             case CHAMPION_ROTATION: // Champion Rotation
-                task.response = this->underlying_client->Champion.rotations(params.at(0));break;
+                response = std::make_shared<Json::Value>(this->underlying_client->Champion.rotations(params.at(0)));break;
             case CLASH: // Clash
                 switch (endpoint_method) {
                     case CL_BY_SUMMONER_ID:
-                        task.response = this->underlying_client->Clash.by_summoner_id(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Clash.by_summoner_id(params.at(0), params.at(1))); break;
                     case CL_BY_TEAM:
-                        task.response = this->underlying_client->Clash.by_team(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Clash.by_team(params.at(0), params.at(1))); break;
                     case CL_TOURNAMENT_BY_TEAM:
-                        task.response = this->underlying_client->Clash.tournament_by_team(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Clash.tournament_by_team(params.at(0), params.at(1))); break;
                     case CL_BY_TOURNAMENT:
-                        task.response = this->underlying_client->Clash.by_tournament(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Clash.by_tournament(params.at(0), params.at(1))); break;
                 }break;
             case LEAGUE: // League
                 switch (endpoint_method) {
                     case CHALLENGER:
-                        task.response = this->underlying_client->League.challenger(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->League.challenger(params.at(0), params.at(1))); break;
                     case GRANDMASTER:
-                        task.response = this->underlying_client->League.grandmaster(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->League.grandmaster(params.at(0), params.at(1))); break;
                     case MASTER:
-                        task.response = this->underlying_client->League.master(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->League.master(params.at(0), params.at(1))); break;
                     case L_BY_SUMMONER_ID:
-                        task.response = this->underlying_client->League.by_summoner_id(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->League.by_summoner_id(params.at(0), params.at(1))); break;
                     case L_BY_LEAGUE_ID:
-                        task.response = this->underlying_client->League.by_league_id(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->League.by_league_id(params.at(0), params.at(1))); break;
                     case L_SPECIFIC_LEAGUE:
-                        task.response = this->underlying_client->League.specific_league(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break; 
+                        response = std::make_shared<Json::Value>(this->underlying_client->League.specific_league(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))))); break; 
                     case L_EXPERIMENTAL:
-                        task.response = this->underlying_client->League_Exp.entries(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->League_Exp.entries(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))))); break;
                 }break;
             case CHALLENGES: // Challenges
                 switch (endpoint_method) {
                     case CH_CONFIGURATION:
-                        task.response = this->underlying_client->Lol_Challenges.config(params.at(0)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Lol_Challenges.config(params.at(0))); break;
                     case CH_PERCENTILES:
-                        task.response = this->underlying_client->Lol_Challenges.percentiles(params.at(0)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Lol_Challenges.percentiles(params.at(0))); break;
                     case CH_CH_CONFIGURATION:
-                        task.response = this->underlying_client->Lol_Challenges.challenge_config(params.at(0), atoi(params.at(1))); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Lol_Challenges.challenge_config(params.at(0), atoi(params.at(1)))); break;
                     case CH_CH_LEADERBOARD:
-                        task.response = this->underlying_client->Lol_Challenges.challenge_leaderboard(params.at(0), atoi(params.at(2)), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Lol_Challenges.challenge_leaderboard(params.at(0), atoi(params.at(2)), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))))); break;
                     case CH_CH_PERCENTILES:
-                        task.response = this->underlying_client->Lol_Challenges.challenge_percentiles(params.at(0), atoi(params.at(1))); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Lol_Challenges.challenge_percentiles(params.at(0), atoi(params.at(1)))); break;
                     case CH_BY_PUUID:
-                        task.response = this->underlying_client->Lol_Challenges.by_puuid(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Lol_Challenges.by_puuid(params.at(0), params.at(1))); break;
                 }break;
             case STATUS: // Lol_Status
                 switch (endpoint_method) {
                     case V4:
-                        task.response = this->underlying_client->Lol_Status.v4(params.at(0)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Lol_Status.v4(params.at(0))); break;
                     case V3:
-                        task.response = this->underlying_client->Lol_Status.v3(params.at(0)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Lol_Status.v3(params.at(0))); break;
                 }break;
             case MATCH: // Match
                 switch (endpoint_method) {
                     case M_BY_MATCH_ID:
-                        task.response = this->underlying_client->Match.by_match_id(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Match.by_match_id(params.at(0), params.at(1))); break;
                     case M_TIMELINE:
-                        task.response = this->underlying_client->Match.timeline(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Match.timeline(params.at(0), params.at(1))); break;
                     case M_BY_PUUID:
-                        task.response = this->underlying_client->Match.by_puuid(params.at(0), params.at(1), 
+                        response = std::make_shared<Json::Value>(this->underlying_client->Match.by_puuid(params.at(0), params.at(1), 
                                 std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)),
                                 std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
                                 std::pair<std::string, int>(opt_names.at(2), atoi(opt_inputs.at(2))),
                                 std::pair<std::string, int>(opt_names.at(3), atoi(opt_inputs.at(3))),
                                 std::pair<std::string, int>(opt_names.at(4), atoi(opt_inputs.at(4))),
                                 std::pair<std::string, int>(opt_names.at(5), atoi(opt_inputs.at(5)))
-                                ); break;
+                                )); break;
                 }break;
             case SUMMONER: // Summoner
                 switch (endpoint_method) {
                     case S_BY_RSO_PUUID:
-                        task.response = this->underlying_client->Summoner.by_rso_puuid(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Summoner.by_rso_puuid(params.at(0), params.at(1))); break;
                     case S_BY_ACCOUNT_ID:
-                        task.response = this->underlying_client->Summoner.by_account_id(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Summoner.by_account_id(params.at(0), params.at(1))); break;
                     case S_BY_NAME:
-                        task.response = this->underlying_client->Summoner.by_name(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Summoner.by_name(params.at(0), params.at(1))); break;
                     case S_BY_PUUID:
-                        task.response = this->underlying_client->Summoner.by_puuid(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Summoner.by_puuid(params.at(0), params.at(1))); break;
                     case S_BY_SUMMONER_ID:
-                        task.response = this->underlying_client->Summoner.by_summoner_id(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Summoner.by_summoner_id(params.at(0), params.at(1))); break;
                 }break;
             case SPECTATOR: // Spectator
                 switch (endpoint_method) {
                     case SP_BY_SUMMONER_ID:
-                        task.response = this->underlying_client->Spectator.by_summoner_id(params.at(0), params.at(1)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Spectator.by_summoner_id(params.at(0), params.at(1))); break;
                     case SP_FEATURED:
-                        task.response = this->underlying_client->Spectator.featured_games(params.at(0)); break;
+                        response = std::make_shared<Json::Value>(this->underlying_client->Spectator.featured_games(params.at(0))); break;
                 }break;
             default: // Catch Exception
                 throw std::invalid_argument("Invalid Endpoint");
         };
+        return response;
     }
 }

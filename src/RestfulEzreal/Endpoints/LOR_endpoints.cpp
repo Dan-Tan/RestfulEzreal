@@ -86,8 +86,8 @@ namespace restfulEz {
         throw std::invalid_argument("Invalid endpoint given");
     }
 
-    void RequestSender::Send_LOR(request& task) {
-        Json::Value response;
+    std::shared_ptr<Json::Value> RequestSender::Send_LOR(request& task) {
+        std::shared_ptr<Json::Value> response;
 
         std::vector<PARAM_CONT>& params = task.params;
         const int endpoint = task._endpoint;
@@ -98,16 +98,16 @@ namespace restfulEz {
                 case MATCH:
                     switch (endpoint_method) {
                         case M_BY_PUUID:
-                            task.response = this->underlying_client->Lor_Match.by_puuid(params.at(0), params.at(1));break;
+                            response = std::make_shared<Json::Value>(this->underlying_client->Lor_Match.by_puuid(params.at(0), params.at(1)));break;
                         case M_BY_MATCH:
-                            task.response = this->underlying_client->Lor_Match.by_match(params.at(0), params.at(1));break;
+                            response = std::make_shared<Json::Value>(this->underlying_client->Lor_Match.by_match(params.at(0), params.at(1)));break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method for LOR_MATCH, greater then 1 (strictly)");
                     }break;
                 case RANKED:
-                    task.response = this->underlying_client->Lor_Ranked.leaderboards(params.at(0));break;
+                    response = std::make_shared<Json::Value>(this->underlying_client->Lor_Ranked.leaderboards(params.at(0)));break;
                 case STATUS:
-                    task.response = this->underlying_client->Lor_Status.v1(params.at(0));break;
+                    response = std::make_shared<Json::Value>(this->underlying_client->Lor_Status.v1(params.at(0)));break;
                 default:
                     throw std::invalid_argument("Invalid Endpoint given, greater then 2 (strictly)");
             }
@@ -115,5 +115,6 @@ namespace restfulEz {
         catch (std::out_of_range const& ex) {
             throw std::invalid_argument("Query Form param index out of range given, (too many arguements)");
         }
+        return response;
     }
 }
