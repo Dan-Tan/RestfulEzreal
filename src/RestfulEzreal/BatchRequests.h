@@ -6,7 +6,6 @@
 #include <string>
 #include <memory>
 #include <queue>
-#include <json/json.h>
 
 #define P_NAME_LENGTH 32
 #define KEY_LENGTH 64
@@ -57,7 +56,6 @@ namespace restfulEz {
         };
     } KEY_CONT;
 
-    using raw_json = std::vector<char>;
     
     // MOST PRIMITIVE REQUEST STRUCT, ENOUGH INFORMATION TO SEND A SINGLE REQUEST
         
@@ -86,12 +84,13 @@ namespace restfulEz {
     struct LinkedRequest;
     struct RequestNode;
 
+    using raw_json = std::vector<char>;
+    using json_ptr = std::unique_ptr<std::vector<char>>;
+
     // JSON ACCESS INFO
         
     typedef struct json_access_info {
         std::vector<KEY_CONT> keys;
-        const Json::Value* index_json(const Json::Value* to_index) const;
-
         PARAM_CONT get_param(const raw_json& response) const;
     } json_access_info;
     
@@ -101,7 +100,7 @@ namespace restfulEz {
         
         json_access_info get_base() const;
         std::vector<PARAM_CONT> get_params(const raw_json& response) const; 
-        std::vector<PARAM_CONT> get_params(std::vector<std::shared_ptr<Json::Value>> responses) const; 
+        std::vector<PARAM_CONT> get_params(const std::vector<json_ptr>& responses) const; 
     } iter_access_info;
 
 
@@ -165,7 +164,6 @@ namespace restfulEz {
         std::vector<std::size_t> progress;
     } IterativeRequest;
 
-    using json_ptr = std::unique_ptr<std::vector<char>>;
 
     typedef union ReqNode {
         std::unique_ptr<LinkedRequest> unsent_request;

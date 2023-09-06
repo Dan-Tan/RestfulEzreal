@@ -115,7 +115,6 @@ namespace restfulEz {
         std::string file_output = this->output_directory + std::string("req") + std::to_string(game) + std::to_string(endpoint)+ std::to_string(endpoint_method) + std::to_string(counter);
         file_output.append(".json");
 
-        Json::StreamWriterBuilder builder;
         std::ofstream output;
 
         output.open(file_output);

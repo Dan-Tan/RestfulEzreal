@@ -1,6 +1,7 @@
 #include "BatchRequests.h"
 #include <json/value.h>
 #include <stdexcept>
+#include "simdjson.h"
 
 #ifdef DEBUG_MODE
 #include <iostream>
@@ -11,67 +12,81 @@
 
 namespace restfulEz {
 
-    const Json::Value* json_access_info::index_json(const Json::Value* to_index) const {
-        const Json::Value* to_return = to_index;
-        try {
-            for (const KEY_CONT& key : keys) {
-                to_index = &(*to_index)[key.key];
-            }
-        }
-        catch (Json::Exception& ex) {
-            throw std::runtime_error("Invalid json keys given");
-        }
-        return to_return;
-    }
+    static simdjson::ondemand::parser parser; //todo convert to unique_ptr in BatchRequest
+    
+    PARAM_CONT json_access_info::get_param(const raw_json& response) const {
 
-    static inline void access_params(const Json::Value* response, std::vector<PARAM_CONT>& to_add, const std::vector<KEY_CONT>& keys, std::size_t iter_limit) {
-        const Json::Value* access;
-
-        if (!response->isArray()) {
-            throw std::runtime_error("Invalid sequence of keys, Json is not array and cannot be iterated through");
-        }
-        for (int i = 0; i < response->size(); i++) {
-
-            if (i >= iter_limit && iter_limit != 0) {
-                break;
-            }
-
-            access = &(*response)[i];
-            for (auto& key : keys) {
-                access = &(*access)[key.key]; // not very nice
-            }
-            to_add.push_back((*access).asCString());
-        }
-    }
-
-    PARAM_CONT json_access_info::get_param(std::shared_ptr<Json::Value> response) const {
-        const Json::Value* access = response.get();
+        simdjson::ondemand::document doc = parser.iterate(response.data(), strlen(response.data()), sizeof(response.data()));
+        simdjson::ondemand::value obj_temp = doc;
 
         for (const KEY_CONT& key : this->keys) {
-            access = &(*access)[key.key];
+            obj_temp = obj_temp.find_field(key.key);
         }
-        PARAM_CONT param_extracted = (*access).asCString();
+
+        PARAM_CONT param_extracted;
+        const std::string_view param_in_json = obj_temp.get_string().value();
+        param_in_json.copy(param_extracted.param, param_in_json.length());
+
         return param_extracted;
     }
 
     std::vector<PARAM_CONT> iter_access_info::get_params(const raw_json& response) const {
         std::vector<PARAM_CONT> to_ret;
 
-        const Json::Value* array_json = this->index_json(response.get());
+        simdjson::ondemand::document doc = parser.iterate(response.data(), strlen(response.data()), sizeof(response.data()));
+        simdjson::ondemand::value obj_temp = doc;
 
-        access_params(response.get(), to_ret, this->access_after_iter.keys, this->iter_limit);
+        for (const KEY_CONT& key : this->keys) {
+            obj_temp = obj_temp.find_field(key.key);
+        }
 
+        if (!(obj_temp.type() == simdjson::ondemand::json_type::array)) {
+            throw std::runtime_error("User passed invalid keys not pointing to array");
+        }
+
+        std::string_view param_to_add;
+
+        for (simdjson::ondemand::value tmp : obj_temp) {
+            for (const KEY_CONT& sec_key : this->access_after_iter.keys) {
+                tmp = tmp.find_field(sec_key.key);
+            }
+            param_to_add = tmp.get_string().value();
+            to_ret.push_back({});
+            param_to_add.copy(to_ret.back().param, param_to_add.length());
+        }
         return to_ret;
     }
 
-    std::vector<PARAM_CONT> iter_access_info::get_params(std::vector<std::shared_ptr<Json::Value>> responses) const {
+    static inline void access_params(const raw_json& response, std::vector<PARAM_CONT>& to_add, const std::vector<KEY_CONT>& keys_one, const std::vector<KEY_CONT>& keys_two, std::size_t iter_limit) {
+        simdjson::ondemand::document doc = parser.iterate(response.data(), strlen(response.data()), sizeof(response.data()));
+        simdjson::ondemand::value obj_temp = doc;
+
+        for (const KEY_CONT& key : keys_one) {
+            obj_temp = obj_temp.find_field(key.key);
+        }
+
+        if (!(obj_temp.type() == simdjson::ondemand::json_type::array)) {
+            throw std::runtime_error("User passed invalid keys not pointing to array");
+        }
+
+        std::string_view param_to_add;
+
+        for (simdjson::ondemand::value tmp : obj_temp) {
+            for (const KEY_CONT& sec_key : keys_two) {
+                tmp = tmp.find_field(sec_key.key);
+            }
+            param_to_add = tmp.get_string().value();
+            to_add.push_back({});
+            param_to_add.copy(to_add.back().param, param_to_add.length());
+        }
+        
+    }
+
+    std::vector<PARAM_CONT> iter_access_info::get_params(const std::vector<json_ptr>& responses) const {
         std::vector<PARAM_CONT> to_ret;
 
-        const Json::Value* array_json = nullptr;
-
-        for (std::shared_ptr<Json::Value> result : responses) {
-            array_json = this->index_json(result.get());
-            access_params(result.get(), to_ret, this->access_after_iter.keys, this->iter_limit);
+        for (int i = 0; i < responses.size(); i++) {
+            access_params(*responses[i], to_ret, this->keys, this->access_after_iter.keys, this->iter_limit);
         }
         return to_ret;
     }
@@ -80,7 +95,7 @@ namespace restfulEz {
         try {
             std::size_t index = 0;
             for (json_access_info& info : this->link_info) {
-                to_fill[this->param_indices[index]] = info.get_param(this->parent->_node->request_results[0]);
+                to_fill[this->param_indices[index]] = info.get_param(*this->parent->_node->request_results[0]);
                 index++;
             }
         }
@@ -157,8 +172,8 @@ namespace restfulEz {
             std::size_t counter = 0;
             for (json_access_info& noniter_link : this->link_info) {
                 to_fill.push_back({});
-                for (std::shared_ptr<Json::Value> res : this->parent->_node->request_results) {
-                    to_fill.back().push_back(noniter_link.get_param(res));
+                for (int i = 0; i < this->parent->_node->request_results.size(); i++) {
+                    to_fill.back().push_back(noniter_link.get_param(*this->parent->_node->request_results[i]));
                 }
                 counter++;
             }
@@ -378,6 +393,7 @@ namespace restfulEz {
         D("Batch Request Receiving result");
         D("Json vector length" << this->current_results->_node->request_results.size());
         if (this->current_request->children.size() != 0) {
+            result->insert(result->end(), simdjson::SIMDJSON_PADDING, '\0');
             // only save the response if required for dependent requests
             this->current_results->_node->request_results.push_back(std::move(result));
         }

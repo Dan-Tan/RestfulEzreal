@@ -1,10 +1,12 @@
 #include "Walnut/Application.h"
 #include <iostream>
 #include <thread>
+#include <regex>
 #include <tuple>
 #include <array>
 #include <json/json.h>
 #include "RestfulEzreal.h"
+#include "simdjson.h"
 
 #ifndef CONFIG_FILE_PATH
 #define CONFIG_FILE_PATH "./EzrealRunes.json"
@@ -83,8 +85,6 @@ namespace restfulEz {
 #if DEBUG_MODE
         ImGui::ShowMetricsWindow();
 #endif
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, 0x0F0D12FF);
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, 0x0F0D12FF);
 
         static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration;
         static bool open = true;
@@ -102,9 +102,6 @@ namespace restfulEz {
 
         ImGui::End();
 
-        ImGui::PopStyleColor();
-        ImGui::PopStyleColor();
-
         // In a seperate window render the status of the client.
         this->render_client_status();
     }
@@ -114,38 +111,40 @@ namespace restfulEz {
         bool valid_key = false;
         bool tested = false;
 
+        static const std::regex reg_stat("status");
+        static std::smatch not_used;
+
         if (!valid_key && !tested) {
-            Json::Value response = this->_underlying_client->Lol_Status.v4("OC1");
-            if (response.empty()) {
+            json_ptr response = this->_underlying_client->Lol_Status.v4("OC1");
+            std::string raw_rp = response->data();
+            if (response->empty()) {
                 tested = true;
                 valid_key = false;
             }
-            else if (!response.isMember("status")) {
+            else if (!std::regex_search(raw_rp, not_used, reg_stat)) {
                 valid_key = true;
                 tested = true;
             }
             else {
-                if (response["status"].isMember("status_code")) {
-                    ImGui::Text("UNEXPECTED RESPONSE FORMAT");
-                }
-                const int  response_code = response["status"]["status_code"].asInt();
-                if (response_code == 401 || response_code == 403) {
+                static const std::regex code("(401|403)");
+                static const std::regex stat_code("status_code");
+                if (std::regex_search(raw_rp, not_used, code) || std::regex_search(raw_rp, not_used, stat_code)) {
                     tested = true;
                     valid_key = false;
                 }
             }
         }
         if (!valid_key && !tested) {
-            Json::Value response = this->_underlying_client->Lol_Status.v4("KR");
-            if (!response.empty() || !response.isMember("status")) {
+            json_ptr response = this->_underlying_client->Lol_Status.v4("KR");
+            std::string raw_rp = response->data();
+            static const std::regex stat("status");
+            if (!response->empty() || !std::regex_search(raw_rp, not_used, stat)) {
                 valid_key = true;
             }
             else {
-                if (response["status"].isMember("status_code")) {
-                    ImGui::Text("UNEXPECTED RESPONSE FORMAT");
-                }
-                const int  response_code = response["status"]["status_code"].asInt();
-                if (response_code == 401 || response_code == 403) {
+                static const std::regex code("(401|403)");
+                static const std::regex stat_code("status_code");
+                if (std::regex_search(raw_rp, not_used, code) || std::regex_search(raw_rp, not_used, stat_code)) {
                     tested = true;
                     valid_key = false;
                 }
@@ -229,20 +228,35 @@ namespace restfulEz {
         }
     }
 
+    static void write_config_file(const char api_key[256], const char path_to_log[64], const char path_to_output[64], const bool verbosity, const logging::LEVEL level_) {
+        // format config file as json
+
+        std::ofstream config_file(CONFIG_FILE_PATH, std::ios::trunc);
+
+        config_file << "{\n";
+        config_file << "\t\"api-key\" : \"" << api_key << "\"\n";
+        config_file << "\t\"log-path\" : \"" << path_to_log << "\"\n";
+        config_file << "\t\"log-level\" : \"" << static_cast<int>(level_) << "\"\n";
+        config_file << "\t\"output-path\" : \"" << path_to_output << "\"\n";
+        config_file << "\t\"verbosity\" : \"" << (verbosity ? "true" : "false") << "\"\n";
+        config_file << "}";
+
+        config_file.close();
+    }
+
     void RestfulEzreal::config_check() {
-        Json::Value config;
         if (file_exists(CONFIG_FILE_PATH)) {
-            std::ifstream config_file;
-            config_file.open(CONFIG_FILE_PATH);
+            simdjson::ondemand::parser parser;
+            simdjson::padded_string contents = simdjson::padded_string::load(CONFIG_FILE_PATH);
+            simdjson::ondemand::document doc = parser.iterate(contents);
 
-            Json::Reader reader;
-            if (!reader.parse(config_file, config)) { return; }// log
+            logging::LEVEL report_level = static_cast<logging::LEVEL>(doc["log-level"].get_int64().value());
+            this->_path_to_output = std::string(doc["output-path"].get_string().value());
 
-            logging::LEVEL report_level = static_cast<logging::LEVEL>(config["log-level"].asInt());
-            this->_path_to_output = config["output-path"].asString();
+            std::string log_path;
+            log_path = doc["log-path"].get_string().value();
 
-            this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, config["log-path"].asString(), report_level, config["verbosity"].asBool());
-            config_file.open(CONFIG_FILE_PATH);
+            this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, log_path, report_level, doc["verbosity"].get_bool().value());
             this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
             this->batch_group->set_sender(this->request_sender);
             return;
@@ -256,7 +270,6 @@ namespace restfulEz {
             static char api_key[256] = "";
             static char path_to_log[64] = "";
             static char path_to_output[64] = "";
-            static char logging_level[16] = "";
             static bool verbosity = false;
             static bool selected[5] = {};
 
@@ -295,16 +308,8 @@ namespace restfulEz {
             }
             ImGui::Checkbox("Verbose Logging", &verbosity);
 
-            if (ImGui::Button("Submit")) { config["api-key"] = api_key;
-                config["log-path"] = path_to_log;
-                config["output-path"] = path_to_output;
-                config["verbosity"] = verbosity;
-                config["log-level"] = level_;
-                Json::StreamWriterBuilder builder;
-                std::ofstream config_file;
-                config_file.open(CONFIG_FILE_PATH);
-                config_file << Json::writeString(builder, config);
-                config_file.close();
+            if (ImGui::Button("Submit")) { 
+                write_config_file(api_key, path_to_log, path_to_output, verbosity, level_);
                 this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
                 this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
                 this->batch_group->set_sender(this->request_sender);

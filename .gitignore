@@ -6,3 +6,4 @@ Debug/
 .cache
 .vs
 !build/imgui.ini
+.clangd

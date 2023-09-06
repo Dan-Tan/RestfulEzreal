@@ -20,12 +20,14 @@ add_library(RestfulEzreal STATIC
     src/RestfulEzreal/Endpoints/TFT_endpoints.cpp
     src/RestfulEzreal/Endpoints/LOR_endpoints.cpp
     src/RestfulEzreal/Endpoints/VAL_endpoints.cpp
-    src/RestfulEzreal/RestfulEzreal.cpp)
+    src/RestfulEzreal/RestfulEzreal.cpp
+    simdjson_temp/simdjson.cpp)
 
 target_compile_definitions(RestfulEzreal PRIVATE $<$<CONFIG:Debug>:DEBUG_MODE>)
 target_compile_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
 target_link_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
 
+#add_subdirectory(simdjson EXCLUDE_FROM_ALL)
 add_subdirectory(riot-cpp/src/riot-cpp)
 add_subdirectory(Walnut)
 
@@ -36,10 +38,13 @@ target_compile_definitions(Restful-Ezreal PRIVATE $<$<CONFIG:Debug>:DEBUG_MODE>)
 target_compile_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
 target_link_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
 
+#target_include_directories(RestfulEzreal PUBLIC ./simdjson/include/)
+target_include_directories(RestfulEzreal PUBLIC ./simdjson_temp/)
 target_include_directories(RestfulEzreal PUBLIC ${CURL_INCLUDE_DIRS})
 target_include_directories(RestfulEzreal PUBLIC ./riot-cpp/src/riot-cpp)
 
 target_link_libraries(RestfulEzreal PUBLIC Walnut)
+#target_link_libraries(RestfulEzreal PUBLIC simdjson)
 target_link_libraries(RestfulEzreal PUBLIC riot-cpp)
 
 target_include_directories(Restful-Ezreal PRIVATE ./riot-cpp/src/riot-cpp)
