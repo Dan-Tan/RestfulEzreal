@@ -10,6 +10,12 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(MACOSX TRUE)
 endif()
 
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message("Debug Build")
+else()
+    message("Non-Debug Build")
+endif()
+
 
 add_library(RestfulEzreal STATIC 
     src/RestfulEzreal/QueryForm.cpp
@@ -24,8 +30,11 @@ add_library(RestfulEzreal STATIC
     simdjson_temp/simdjson.cpp)
 
 target_compile_definitions(RestfulEzreal PRIVATE $<$<CONFIG:Debug>:DEBUG_MODE>)
-target_compile_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
-target_link_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
+    target_link_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
+else()
+endif()
 
 #add_subdirectory(simdjson EXCLUDE_FROM_ALL)
 add_subdirectory(riot-cpp/src/riot-cpp)
@@ -35,8 +44,11 @@ add_executable(Restful-Ezreal restfulEz_main.cpp)
 
 target_compile_definitions(Restful-Ezreal PRIVATE $<$<CONFIG:Debug>:DEBUG_MODE>)
 
-target_compile_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
-target_link_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
+    target_link_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
+else()
+endif()
 
 #target_include_directories(RestfulEzreal PUBLIC ./simdjson/include/)
 target_include_directories(RestfulEzreal PUBLIC ./simdjson_temp/)
