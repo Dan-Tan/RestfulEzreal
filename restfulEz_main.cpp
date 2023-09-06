@@ -55,7 +55,9 @@ Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
 
         app->PushLayer(navigBar);
         app->PushLayer(_main);
+#if DEBUG_MODE
 	app->PushLayer<ExampleLayer>();
+#endif
 	app->SetMenubarCallback([app]()
 	{
 		if (ImGui::BeginMenu("File"))

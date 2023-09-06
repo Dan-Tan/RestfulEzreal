@@ -41,10 +41,7 @@ namespace restfulEz {
             int _next_form_id = 1;
 
         public:
-            RestfulEzreal(current_page* on_display) {
-                this->_on_display = on_display;
-                this->batch_group = std::make_shared<BatchForm>();
-            };
+            RestfulEzreal(current_page* on_display);
 
             void OnUIRender() override;
             QUERY_FORM* _next_request = nullptr;

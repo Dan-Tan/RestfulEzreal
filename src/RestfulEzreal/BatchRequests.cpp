@@ -54,7 +54,7 @@ namespace restfulEz {
         return param_extracted;
     }
 
-    std::vector<PARAM_CONT> iter_access_info::get_params(std::shared_ptr<Json::Value> response) const {
+    std::vector<PARAM_CONT> iter_access_info::get_params(const raw_json& response) const {
         std::vector<PARAM_CONT> to_ret;
 
         const Json::Value* array_json = this->index_json(response.get());
@@ -354,7 +354,7 @@ namespace restfulEz {
 
     std::unique_ptr<LinkedRequest> RequestNode::send_request() {
         std::unique_ptr<LinkedRequest> to_send = std::move(this->_node->unsent_request);
-        this->_node = std::make_unique<ReqNode>(std::vector<std::shared_ptr<Json::Value>>());
+        this->_node = std::make_unique<ReqNode>(); // this will instantiate an empty vector
         this->sent = true;
         return to_send;
     };
@@ -374,10 +374,13 @@ namespace restfulEz {
         return this->current_request->get_base_copy();
     }
 
-    bool BatchRequest::insert_result(std::shared_ptr<Json::Value> result) {
+    bool BatchRequest::insert_result(json_ptr result) {
         D("Batch Request Receiving result");
-        D("Json::Value vector length" << this->current_results->_node->request_results.size());
-        this->current_results->_node->request_results.push_back(result);
+        D("Json vector length" << this->current_results->_node->request_results.size());
+        if (this->current_request->children.size() != 0) {
+            // only save the response if required for dependent requests
+            this->current_results->_node->request_results.push_back(std::move(result));
+        }
         // if the request has finished we should insert all ready child requests
         if (!this->current_request->update_base()) {
             for (auto& child : this->current_request->children) {

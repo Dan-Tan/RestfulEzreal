@@ -65,8 +65,10 @@ namespace restfulEz {
         }
     }
 
-    std::shared_ptr<Json::Value> RequestSender::Send_Request(request& task) {
-        std::shared_ptr<Json::Value> response;
+    using json_ptr = std::unique_ptr<std::vector<char>>;
+
+    json_ptr RequestSender::Send_Request(request& task) {
+        json_ptr response;
         switch (task._game) {
             case 0: // RIOT
                 response = this->Send_Riot(task); break;
@@ -81,32 +83,32 @@ namespace restfulEz {
             default:
                 throw std::invalid_argument("Invalid Game Index");
         }
-        this->write_response_file(task, response);
-        return response;
+        this->write_response_file(task, *response);
+        return std::move(response);
     }
 
-    std::shared_ptr<Json::Value> RequestSender::Send_Riot(request& task) {
+    json_ptr RequestSender::Send_Riot(request& task) {
         std::vector<PARAM_CONT> & params = task.params;
 
         switch (task._endpoint_method) {
             case 0:
-                return std::make_shared<Json::Value>(this->underlying_client->Account.by_puuid(params.at(0), params.at(1))); break;
+                return std::move(this->underlying_client->Account.by_puuid(params.at(0), params.at(1))); break;
             case 1:
-                return std::make_shared<Json::Value>(this->underlying_client->Account.by_riot_id(params.at(0), params.at(1), params.at(2))); break;
+                return std::move(this->underlying_client->Account.by_riot_id(params.at(0), params.at(1), params.at(2))); break;
             case 2:
-                return std::make_shared<Json::Value>(this->underlying_client->Account.by_game(params.at(0), params.at(1), params.at(2))); break;
+                return std::move(this->underlying_client->Account.by_game(params.at(0), params.at(1), params.at(2))); break;
             default:
-                throw std::invalid_argument("Given ivnalid endpoint method index for Riot Accout endpoint");
+                throw std::move("Given ivnalid endpoint method index for Riot Accout endpoint");
         }
     }
 
-    void RequestSender::write_response_file(const request& task, std::shared_ptr<Json::Value> result) {
+    using raw_json = std::vector<char>;
+
+    void RequestSender::write_response_file(const request& task, const raw_json& result) {
         // write more informative file names
         const int game = task._game;
         const int endpoint = task._endpoint;
         const int endpoint_method = task._endpoint_method;
-
-        const Json::Value& response = *result;
 
         static int counter = 0; // change as well
 
@@ -117,7 +119,7 @@ namespace restfulEz {
         std::ofstream output;
 
         output.open(file_output);
-        output << response;
+        output << result.data();
         output.close();
 
         counter++;
@@ -127,13 +129,13 @@ namespace restfulEz {
 
         // assume all tasks in the linked are ready to execute
         bool not_finished = true;
-        std::shared_ptr<Json::Value> result;
+        json_ptr result;
 
         request next = batch->get_next();
         while (!next.same_endpoint(BatchRequest::FINISHED)) {
             D("Sending Request (game: " << next._game << ",endpoint: " << next._endpoint << ", method: " << next._endpoint_method << ")");
             result = this->Send_Request(next);
-            while (batch->insert_result(result)) {
+            while (batch->insert_result(std::move(result))) {
                 next = batch->get_current();
                 this->Send_Request(next);
             }

@@ -57,8 +57,7 @@ namespace restfulEz {
         };
     } KEY_CONT;
 
-
-
+    using raw_json = std::vector<char>;
     
     // MOST PRIMITIVE REQUEST STRUCT, ENOUGH INFORMATION TO SEND A SINGLE REQUEST
         
@@ -93,7 +92,7 @@ namespace restfulEz {
         std::vector<KEY_CONT> keys;
         const Json::Value* index_json(const Json::Value* to_index) const;
 
-        PARAM_CONT get_param(std::shared_ptr<Json::Value> response) const;
+        PARAM_CONT get_param(const raw_json& response) const;
     } json_access_info;
     
     typedef struct iter_access_info : json_access_info {
@@ -101,7 +100,7 @@ namespace restfulEz {
         json_access_info access_after_iter;
         
         json_access_info get_base() const;
-        std::vector<PARAM_CONT> get_params(std::shared_ptr<Json::Value> response) const; 
+        std::vector<PARAM_CONT> get_params(const raw_json& response) const; 
         std::vector<PARAM_CONT> get_params(std::vector<std::shared_ptr<Json::Value>> responses) const; 
     } iter_access_info;
 
@@ -166,11 +165,15 @@ namespace restfulEz {
         std::vector<std::size_t> progress;
     } IterativeRequest;
 
+    using json_ptr = std::unique_ptr<std::vector<char>>;
+
     typedef union ReqNode {
         std::unique_ptr<LinkedRequest> unsent_request;
-        std::vector<std::shared_ptr<Json::Value>> request_results;
+        std::vector<json_ptr> request_results;
         ReqNode(std::unique_ptr<LinkedRequest> unsent) : unsent_request(std::move(unsent)) {};
-        ReqNode(std::vector<std::shared_ptr<Json::Value>> results) : request_results(results) {};
+        ReqNode() {
+            request_results = std::vector<json_ptr>();
+        };
         ~ReqNode() {};
     } ReqNode;
     
@@ -235,7 +238,8 @@ namespace restfulEz {
 
             request get_next();
             request get_current();
-            bool insert_result(std::shared_ptr<Json::Value> result);
+            using json_ptr = std::unique_ptr<std::vector<char>>;
+            bool insert_result(json_ptr result);
             // request returned when the batch request is finished
             static request FINISHED;
 

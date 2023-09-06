@@ -133,8 +133,10 @@ namespace restfulEz {
         throw std::invalid_argument("Invalid Endpoint Index");
     }
 
-    std::shared_ptr<Json::Value> RequestSender::Send_TFT(request& task) {
-        std::shared_ptr<Json::Value> response;
+    using json_ptr = std::unique_ptr<std::vector<char>>;
+
+    json_ptr RequestSender::Send_TFT(request& task) {
+        json_ptr response;
 
         std::vector<PARAM_CONT>& params = task.params;
         std::vector<P_NAME>& opt_names = task.optional_names;
@@ -146,46 +148,46 @@ namespace restfulEz {
                 case LEAGUE:
                     switch (endpoint_method) {
                         case CHALLENGER:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_League.challenger(params.at(0)));break;
+                            response = this->underlying_client->Tft_League.challenger(params.at(0));break;
                         case GRANDMASTER:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_League.grandmaster(params.at(0)));break;
+                            response = this->underlying_client->Tft_League.grandmaster(params.at(0));break;
                         case MASTER:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_League.master(params.at(0)));break;
+                            response = this->underlying_client->Tft_League.master(params.at(0));break;
                         case L_BY_SUMMONER_ID:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_League.by_summoner_id(params.at(0), params.at(1)));break;
+                            response = this->underlying_client->Tft_League.by_summoner_id(params.at(0), params.at(1));break;
                         case L_BY_LEAGUE_ID:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_League.by_league_id(params.at(0), params.at(1)));break;
+                            response = this->underlying_client->Tft_League.by_league_id(params.at(0), params.at(1));break;
                         case QUEUE_TOP:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_League.queue_top(params.at(0), params.at(1)));break;
+                            response = this->underlying_client->Tft_League.queue_top(params.at(0), params.at(1));break;
                         case L_BY_TIER_DIVISION:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_League.by_tier_division(params.at(0), params.at(1), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))));break;
+                            response = this->underlying_client->Tft_League.by_tier_division(params.at(0), params.at(1), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))));break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method Index Given for Tft_League");
                     } break;
                 case MATCH:
                     switch (endpoint_method) {
                         case M_BY_PUUID:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), 
+                            response = this->underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), 
                                     std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))),
                                     std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
                                     std::pair<std::string, int>(opt_names.at(2), atoi(opt_inputs.at(2))),
                                     std::pair<std::string, int>(opt_names.at(3), atoi(opt_inputs.at(3)))
-                                        ));break;
+                                        );break;
                         case M_BY_MATCH_ID:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_Match.by_match(params.at(0), params.at(1)));break;
+                            response = this->underlying_client->Tft_Match.by_match(params.at(0), params.at(1));break;
                     } break;
                 case STATUS:
-                    response = std::make_shared<Json::Value>(this->underlying_client->Tft_Status.v1(params.at(0)));break;
+                    response = this->underlying_client->Tft_Status.v1(params.at(0));break;
                 case SUMMONER:
                     switch (endpoint_method) {
                         case S_BY_ACCOUNT_ID:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_Summoner.by_account(params.at(0), params.at(1)));break;
+                            response = this->underlying_client->Tft_Summoner.by_account(params.at(0), params.at(1));break;
                         case S_BY_NAME:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_Summoner.by_name(params.at(0), params.at(1)));break;
+                            response = this->underlying_client->Tft_Summoner.by_name(params.at(0), params.at(1));break;
                         case S_BY_PUUID:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_Summoner.by_puuid(params.at(0), params.at(1)));break;
+                            response = this->underlying_client->Tft_Summoner.by_puuid(params.at(0), params.at(1));break;
                         case S_BY_SUMMONER_ID:
-                            response = std::make_shared<Json::Value>(this->underlying_client->Tft_Summoner.by_summoner_id(params.at(0), params.at(1)));break;
+                            response = this->underlying_client->Tft_Summoner.by_summoner_id(params.at(0), params.at(1));break;
                     } break;
                 default:
                     throw std::invalid_argument("Invaid Endpoint Index given");
@@ -196,6 +198,6 @@ namespace restfulEz {
             ss << ex.what() << " Tried to index too many parameters";
             throw std::out_of_range(ss.str());
         }
-        return response;
+        return std::move(response);
     }
 }

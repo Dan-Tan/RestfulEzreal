@@ -738,7 +738,7 @@ namespace restfulEz {
                 return;
             }
         }
-        D("Adding child request into parent list");
+        D("ITERATIVE: Adding child request into parent list");
         parent->get_base_request()->_node->unsent_request->children.push_back(current); // beautiful
         // insert new link didn't find existing with same parent
         child_node->iter_dependencies.push_back({});
@@ -762,7 +762,7 @@ namespace restfulEz {
                 return;
             }
         }
-        D("Adding child request into parent list");
+        D("NON-ITERATIVE: Adding child request into parent list");
         parent->get_base_request()->_node->unsent_request->children.push_back(current); // beautiful
         child_node->dependencies.push_back({});
         child_node->dependencies.back().parent = parent->get_base_request();
@@ -777,14 +777,16 @@ namespace restfulEz {
     void LinkedForm<N>::link_final_requests() {
 
         D(static_cast<int>(N) << this->rep());
-
+        
+        // link iterative fields
         auto iter_fl = [this](int i){return this->iterative[i];};
         for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(iter_fl)) {
             D("Inserting iterative linked parent: index" << i);
             this->iter_info[i-1]->iter_limit = std::atoi(this->iter_limits[i-1]);
             insert_link_iter(this->base_request, this->parents[i-1], *this->iter_info[i-1], i);
         }
-
+        
+        // link linked fields (NOT ITERATIVE)
         auto link_fl = [this](int i){return this->linked[i] && !this->iterative[i];};
         for (int i : std::views::iota(0, static_cast<int>(N)) | std::views::filter(link_fl)) {
             D("Inserting non itertive linked parent: index" << i);

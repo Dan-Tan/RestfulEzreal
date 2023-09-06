@@ -27,12 +27,11 @@ target_compile_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
 target_link_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
 
 add_subdirectory(riot-cpp/src/riot-cpp)
-add_subdirectory(riot-cpp/src/jsoncpp)
 add_subdirectory(Walnut)
 
-target_link_libraries(riot-cpp jsoncpp)
-
 add_executable(Restful-Ezreal restfulEz_main.cpp)
+
+target_compile_definitions(Restful-Ezreal PRIVATE $<$<CONFIG:Debug>:DEBUG_MODE>)
 
 target_compile_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
 target_link_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)

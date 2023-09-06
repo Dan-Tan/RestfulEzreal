@@ -60,15 +60,19 @@ namespace restfulEz {
 
         private: // methods
             void worker();
-            void write_response_file(const request& task, std::shared_ptr<Json::Value> result);
 
-            std::shared_ptr<Json::Value> Send_Request(request& task);
+            using raw_json = std::vector<char>;
+            void write_response_file(const request& task, const raw_json& result);
+
+            using json_ptr = std::unique_ptr<std::vector<char>>;
+
+            json_ptr Send_Request(request& task);
             void Send_Batch_Request(std::shared_ptr<BatchRequest> task);
 
-            std::shared_ptr<Json::Value> Send_Riot(request& task);
-            std::shared_ptr<Json::Value> Send_LOL(request& task);
-            std::shared_ptr<Json::Value> Send_VAL(request& task);
-            std::shared_ptr<Json::Value> Send_TFT(request& task);
-            std::shared_ptr<Json::Value> Send_LOR(request& task);
+            json_ptr Send_Riot(request& task);
+            json_ptr Send_LOL(request& task);
+            json_ptr Send_VAL(request& task);
+            json_ptr Send_TFT(request& task);
+            json_ptr Send_LOR(request& task);
     };
 }
