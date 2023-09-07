@@ -169,9 +169,7 @@ namespace restfulEz {
         std::unique_ptr<LinkedRequest> unsent_request;
         std::vector<json_ptr> request_results;
         ReqNode(std::unique_ptr<LinkedRequest> unsent) : unsent_request(std::move(unsent)) {};
-        ReqNode() {
-            request_results = std::vector<json_ptr>();
-        };
+        ReqNode() : request_results() {};
         ~ReqNode() {};
     } ReqNode;
     

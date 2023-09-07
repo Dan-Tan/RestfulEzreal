@@ -36,7 +36,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 else()
 endif()
 
-#add_subdirectory(simdjson EXCLUDE_FROM_ALL)
 add_subdirectory(riot-cpp/src/riot-cpp)
 add_subdirectory(Walnut)
 
@@ -50,7 +49,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 else()
 endif()
 
-#target_include_directories(RestfulEzreal PUBLIC ./simdjson/include/)
 target_include_directories(RestfulEzreal PUBLIC ./simdjson_temp/)
 target_include_directories(RestfulEzreal PUBLIC ${CURL_INCLUDE_DIRS})
 target_include_directories(RestfulEzreal PUBLIC ./riot-cpp/src/riot-cpp)

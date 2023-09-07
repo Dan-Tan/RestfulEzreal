@@ -77,6 +77,7 @@ namespace restfulEz {
     RestfulEzreal::RestfulEzreal(current_page* on_display) {
         this->_on_display = on_display;
         this->batch_group = std::make_shared<BatchForm>();
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
         set_colours();
     };
 
@@ -234,11 +235,11 @@ namespace restfulEz {
         std::ofstream config_file(CONFIG_FILE_PATH, std::ios::trunc);
 
         config_file << "{\n";
-        config_file << "\t\"api-key\" : \"" << api_key << "\"\n";
-        config_file << "\t\"log-path\" : \"" << path_to_log << "\"\n";
-        config_file << "\t\"log-level\" : \"" << static_cast<int>(level_) << "\"\n";
-        config_file << "\t\"output-path\" : \"" << path_to_output << "\"\n";
-        config_file << "\t\"verbosity\" : \"" << (verbosity ? "true" : "false") << "\"\n";
+        config_file << "\t\"api-key\" : \"" << api_key << "\",\n";
+        config_file << "\t\"log-path\" : \"" << path_to_log << "\",\n";
+        config_file << "\t\"log-level\" : " << static_cast<int>(level_) << ",\n";
+        config_file << "\t\"output-path\" : \"" << path_to_output << "\",\n";
+        config_file << "\t\"verbosity\" : " << (verbosity ? "true" : "false") << "\n";
         config_file << "}";
 
         config_file.close();
