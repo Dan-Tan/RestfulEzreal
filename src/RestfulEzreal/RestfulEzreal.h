@@ -68,7 +68,10 @@ namespace restfulEz {
             void render_client_config() {};
             void render_json() {};
             void render_rate_status() {};
-
+            
+            void configure_from_existing();
+            bool configure_new_client(bool allow_close = false);
+            void reconfigure_client();
             void config_check();
     };
 }

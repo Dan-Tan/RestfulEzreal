@@ -9,6 +9,8 @@
 #define D(x)  
 #endif
 
+#include <iostream>
+
 namespace restfulEz {
 
     RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir) {

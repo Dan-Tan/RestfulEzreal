@@ -163,11 +163,20 @@ namespace restfulEz {
         static bool open = true;
         static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration;
         ImGui::Begin("Client State", &open, window_flags);
-
+        
         if (!this->_underlying_client) {
             ImGui::Text("Client not intialised");
             ImGui::End();
             return;
+        }
+        static bool reconfiguring = false;
+        if (ImGui::Button("Reconfigure Client")) {
+            reconfiguring = true;
+        }
+        if (reconfiguring) {
+            if (this->configure_new_client(true)) {
+                reconfiguring = false;
+            }// allow the user to close the modal incase of not wanting to reconfigure
         }
 
         if (!this->client_tested) {
@@ -245,14 +254,13 @@ namespace restfulEz {
         config_file.close();
     }
 
-    void RestfulEzreal::config_check() {
-        if (file_exists(CONFIG_FILE_PATH)) {
+    void RestfulEzreal::configure_from_existing() {
             simdjson::ondemand::parser parser;
             simdjson::padded_string contents = simdjson::padded_string::load(CONFIG_FILE_PATH);
             simdjson::ondemand::document doc = parser.iterate(contents);
 
             logging::LEVEL report_level = static_cast<logging::LEVEL>(doc["log-level"].get_int64().value());
-            this->_path_to_output = std::string(doc["output-path"].get_string().value());
+            this->_path_to_output = doc["output-path"].get_string().value();
 
             std::string log_path;
             log_path = doc["log-path"].get_string().value();
@@ -260,14 +268,17 @@ namespace restfulEz {
             this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, log_path, report_level, doc["verbosity"].get_bool().value());
             this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
             this->batch_group->set_sender(this->request_sender);
-            return;
-        }
+    }
+
+    bool RestfulEzreal::configure_new_client(bool allow_close) {
+
         ImGui::OpenPopup("Configure Client");
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
-        if (ImGui::BeginPopupModal("Configure Client", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+        
+        bool unused_open = true;
+        if (ImGui::BeginPopupModal("Configure Client", allow_close ? &unused_open : NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
             static char api_key[256] = "";
             static char path_to_log[64] = "";
             static char path_to_output[64] = "";
@@ -307,8 +318,6 @@ namespace restfulEz {
 
                 ImGui::EndTable();
             }
-            ImGui::Checkbox("Verbose Logging", &verbosity);
-
             if (ImGui::Button("Submit")) { 
                 write_config_file(api_key, path_to_log, path_to_output, verbosity, level_);
                 this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
@@ -319,6 +328,15 @@ namespace restfulEz {
             }
             ImGui::EndPopup();
         }
+        return !unused_open;
+    }
+
+    void RestfulEzreal::config_check() {
+        if (file_exists(CONFIG_FILE_PATH)) {
+            this->configure_from_existing();
+            return;
+        }
+        this->configure_new_client();
     }
 
     void RestfulEzreal::render_advanced_requests() {
