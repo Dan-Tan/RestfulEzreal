@@ -1,6 +1,7 @@
 #include "RequestQueue.h"
 #include "BatchRequests.h"
 #include <stdexcept>
+#include <filesystem>
 
 #ifdef DEBUG_MODE
 #include <iostream>
@@ -13,10 +14,10 @@
 
 namespace restfulEz {
 
-    RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir) {
+    RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir) : output_directory(output_dir) {
         this->worker_thread = std::thread([this] {this->worker();});
         this->underlying_client = client;
-        this->output_directory = output_dir;
+        std::filesystem::create_directories(this->output_directory);
     }
 
     RequestSender::~RequestSender() {

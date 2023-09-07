@@ -24,6 +24,9 @@
 #define D(x)  
 #endif
 
+#define INPUT_TEXT_FRAC 2/3
+#define OPT_INPUT_TEXT_FRAC 1/3
+
 namespace restfulEz {
 
     class QUERY_FORM;
@@ -161,7 +164,7 @@ namespace restfulEz {
 
             bool linked[N] = { 0 };
             bool iterative[N] = { 0 };
-
+            std::vector<std::size_t> optional_to_send; 
             bool configuring = false;
 
             // let user know if the form is finished
@@ -220,6 +223,7 @@ namespace restfulEz {
             bool render_all_fields();
             void render_routing();
             bool render_field(const std::size_t ind);
+            void render_optionals();
             
             // when the user closes the form we want to update certain fields to 
             // to avoid performing calculations on every frame
@@ -550,7 +554,9 @@ namespace restfulEz {
             }
             this->render_routing();
             linking = this->render_all_fields();
-
+            if (this->_accepts_optional) {
+                this->render_optionals();
+            }
             ImGui::EndPopup();
         }
         return linking;
@@ -562,6 +568,92 @@ namespace restfulEz {
             return true;
         } else {
             return false;
+        }
+    }
+
+    inline int find_next_focus(const std::vector<int>& opts_to_send) {
+
+        int next_focus = 0;
+        bool found = false;
+
+        for (const int& opt : opts_to_send) {
+            if (opt == 0) {
+                found = true;
+                break;
+            }
+            next_focus++;
+        }
+        if (found) { 
+            return next_focus;
+        } 
+        return -1;
+    }
+
+    template<std::size_t N>
+    void LinkedForm<N>::render_optionals() {
+
+        if (!this->_accepts_optional) {
+            throw std::logic_error("QUERY_FORM::render_optional should never be called for endpoints with no optional arguements");
+        }
+
+        static char id[5] = "x## ";
+        static int opt_index = 0;
+
+        // render input forms
+        for (int i = 0; i < this->_optionals_to_send.size(); i++) {
+            float text_width = ImGui::GetContentRegionAvail().x * OPT_INPUT_TEXT_FRAC;
+            ImGui::PushItemWidth(text_width);
+            if (this->_optionals_to_send[i] != 1) {
+                continue;
+            }
+            ImGui::InputText(this->_optional_names[i], this->_optional_inputs[i], 256, this->_optional_types[i]);
+
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC - 2 * ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("x").x);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
+            id[3] = i;
+        
+            if (ImGui::Button(id)) {
+                this->_optionals_to_send[i] = 0;
+                this->_n_used_optional_p1 -= 1;
+                opt_index = i;
+            };
+            ImGui::PopItemWidth();
+        }
+
+        float drop_down_width = (0.3f * ImGui::GetContentRegionAvail().x);
+        ImGui::SetNextItemWidth(drop_down_width);
+        if (opt_index == -1) {
+            ;
+        }
+        else if (ImGui::BeginCombo("##OPTIONAL", this->_optional_names[opt_index], ImGuiComboFlags_None))
+        {
+            for (int n = 0; n < this->_optional_names.size(); n++)
+            {
+                if (this->_optionals_to_send[n] == 0) {
+
+                    const bool is_selected = (opt_index == n);
+                    if (ImGui::Selectable(this->_optional_names[n], is_selected)) {
+                        opt_index = n;
+                    }
+
+                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                    if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        // Render add optional button besides dropdown
+        const static char button_name[] = "+";
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC - 2 * ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize(button_name).x);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
+
+        if (ImGui::Button(button_name)) {
+            if (this->_optionals_to_send[opt_index] == 0) {this->_n_used_optional_p1 += 1;};
+            this->_optionals_to_send[opt_index] = 1;
+            opt_index = find_next_focus(this->_optionals_to_send);
         }
     }
 

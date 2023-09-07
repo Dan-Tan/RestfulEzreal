@@ -11,9 +11,6 @@
 #include <string_view>
 
 
-#define INPUT_TEXT_FRAC 2/3
-#define OPT_INPUT_TEXT_FRAC 1/3
-
 
 namespace restfulEz {
 
@@ -138,23 +135,6 @@ namespace restfulEz {
         }
     }
 
-    static inline int find_next_focus(const std::vector<int>& opts_to_send) {
-
-        int next_focus = 0;
-        bool found = false;
-
-        for (const int& opt : opts_to_send) {
-            if (opt == 0) {
-                found = true;
-                break;
-            }
-            next_focus++;
-        }
-        if (found) { 
-            return next_focus;
-        } 
-        return -1;
-    }
 
     void QUERY_FORM::render_optionals(bool already_sent) {
 
@@ -164,7 +144,7 @@ namespace restfulEz {
 
         static char id[5] = "x## ";
         static int opt_index = 0;
-        static float text_width = ImGui::GetContentRegionAvail().x * OPT_INPUT_TEXT_FRAC;
+        static float text_width = ImGui::GetContentRegionMax().x * OPT_INPUT_TEXT_FRAC;
         
         // change style for when the request has already been executed
         if (already_sent) {

@@ -25,7 +25,7 @@ namespace restfulEz {
             bool stop_execution = false;
 
             // output information
-            std::string output_directory;
+            const std::string output_directory;
 
             // Underlying client used to send requests
             std::shared_ptr<client::RiotApiClient> underlying_client = nullptr;
