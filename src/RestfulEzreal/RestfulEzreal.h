@@ -31,6 +31,9 @@ namespace restfulEz {
             current_page* _on_display;
             std::string _path_to_output;
 
+            std::string recent_request = "No requests sent.";
+            std::vector<std::string> param_descriptions = {};
+
             std::vector<QUERY_FORM> _current_forms = {};
             std::shared_ptr<RequestSender> request_sender;
             bool send_next_request = false;
@@ -45,6 +48,8 @@ namespace restfulEz {
 
             void OnUIRender() override;
             QUERY_FORM* _next_request = nullptr;
+
+            void update_recent_request(const std::string& req_name, const std::vector<std::string>& param_names, const std::vector<PARAM_CONT>& param_inputs);
 
         private:
 

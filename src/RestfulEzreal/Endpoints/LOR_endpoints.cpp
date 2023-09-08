@@ -22,6 +22,8 @@
 
 #define S_STATUS 0
 
+#define FORMAT(name, ...) {static const std::string req_name = name; static const std::vector<std::string> p_names = {__VA_ARGS__}; this->update_display_func(req_name, p_names, params);}
+
 namespace restfulEz { 
 
     std::shared_ptr<LinkedInterface> LinkedInterface::make_linked_LOR(const int game, const int end_name, const int endpoint_method) {
@@ -100,15 +102,19 @@ namespace restfulEz {
                 case MATCH:
                     switch (endpoint_method) {
                         case M_BY_PUUID:
+                            FORMAT("Legends of Runeterra | Match | By Puuid", "Routing", "PUUID")
                             response = this->underlying_client->Lor_Match.by_puuid(params.at(0), params.at(1));break;
                         case M_BY_MATCH:
+                            FORMAT("Legends of Runeterra | Match | By Match ID", "Routing", "Match ID")
                             response = this->underlying_client->Lor_Match.by_match(params.at(0), params.at(1));break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method for LOR_MATCH, greater then 1 (strictly)");
                     }break;
                 case RANKED:
+                    FORMAT("Legends of Runeterra | Ranked | Leaderboards", "Routing")
                     response = this->underlying_client->Lor_Ranked.leaderboards(params.at(0));break;
                 case STATUS:
+                    FORMAT("Legends of Runeterra | Status | v1", "Routing")
                     response = this->underlying_client->Lor_Status.v1(params.at(0));break;
                 default:
                     throw std::invalid_argument("Invalid Endpoint given, greater then 2 (strictly)");

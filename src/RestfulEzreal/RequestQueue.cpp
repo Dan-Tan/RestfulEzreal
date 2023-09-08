@@ -14,7 +14,9 @@
 
 namespace restfulEz {
 
-    RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir) : output_directory(output_dir) {
+    RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir, 
+            std::function<void(const std::string&, const std::vector<std::string>&, const std::vector<PARAM_CONT>&)> func) 
+        : output_directory(output_dir), update_display_func(func) {
         this->worker_thread = std::thread([this] {this->worker();});
         this->underlying_client = client;
         std::filesystem::create_directories(this->output_directory);

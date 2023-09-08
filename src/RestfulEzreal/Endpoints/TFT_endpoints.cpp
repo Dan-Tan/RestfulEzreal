@@ -35,6 +35,8 @@
 #define S_BY_PUUID 2
 #define S_BY_SUMMONER_ID 3
 
+#define FORMAT(name, ...) {static const std::string req_name = name; static const std::vector<std::string> p_names = {__VA_ARGS__}; this->update_display_func(req_name, p_names, params);}
+
 namespace restfulEz {
 
     std::shared_ptr<LinkedInterface> LinkedInterface::make_linked_TFT(const int game, const int end_name, const int endpoint_method) {
@@ -148,18 +150,25 @@ namespace restfulEz {
                 case LEAGUE:
                     switch (endpoint_method) {
                         case CHALLENGER:
+                            FORMAT("Teamfight Tactics | League | Challenger", "Routing")
                             response = this->underlying_client->Tft_League.challenger(params.at(0));break;
                         case GRANDMASTER:
+                            FORMAT("Teamfight Tactics | League | Grandmaster", "Routing")
                             response = this->underlying_client->Tft_League.grandmaster(params.at(0));break;
                         case MASTER:
+                            FORMAT("Teamfight Tactics | League | Master", "Routing")
                             response = this->underlying_client->Tft_League.master(params.at(0));break;
                         case L_BY_SUMMONER_ID:
+                            FORMAT("Teamfight Tactics | League | By Summoner ID", "Routing", "Summoner ID")
                             response = this->underlying_client->Tft_League.by_summoner_id(params.at(0), params.at(1));break;
                         case L_BY_LEAGUE_ID:
+                            FORMAT("Teamfight Tactics | League | By League ID", "Routing", "League ID")
                             response = this->underlying_client->Tft_League.by_league_id(params.at(0), params.at(1));break;
                         case QUEUE_TOP:
+                            FORMAT("Teamfight Tactics | League | Queue Top", "Routing", "Queue")
                             response = this->underlying_client->Tft_League.queue_top(params.at(0), params.at(1));break;
                         case L_BY_TIER_DIVISION:
+                            FORMAT("Teamfight Tactics | League | Specific League", "Routing", "Tier", "Division")
                             response = this->underlying_client->Tft_League.by_tier_division(params.at(0), params.at(1), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))));break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method Index Given for Tft_League");
@@ -167,6 +176,7 @@ namespace restfulEz {
                 case MATCH:
                     switch (endpoint_method) {
                         case M_BY_PUUID:
+                            FORMAT("Teamfight Tactics | Match | By PUUID", "Routing", "PUUID")
                             response = this->underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), 
                                     std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))),
                                     std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
@@ -174,19 +184,25 @@ namespace restfulEz {
                                     std::pair<std::string, int>(opt_names.at(3), atoi(opt_inputs.at(3)))
                                         );break;
                         case M_BY_MATCH_ID:
+                            FORMAT("Teamfight Tactics | Match | By Match ID", "Routing", "Match ID")
                             response = this->underlying_client->Tft_Match.by_match(params.at(0), params.at(1));break;
                     } break;
                 case STATUS:
+                    FORMAT("Teamfight Tactics | Status | v1", "Routing")
                     response = this->underlying_client->Tft_Status.v1(params.at(0));break;
                 case SUMMONER:
                     switch (endpoint_method) {
                         case S_BY_ACCOUNT_ID:
+                            FORMAT("Teamfight Tactics | Summoner | By Account ID", "Routing", "Account ID")
                             response = this->underlying_client->Tft_Summoner.by_account(params.at(0), params.at(1));break;
                         case S_BY_NAME:
+                            FORMAT("Teamfight Tactics | Summoner | By Name", "Routing", "Name")
                             response = this->underlying_client->Tft_Summoner.by_name(params.at(0), params.at(1));break;
                         case S_BY_PUUID:
+                            FORMAT("Teamfight Tactics | Summoner | By Puuid", "Routing", "PUUID")
                             response = this->underlying_client->Tft_Summoner.by_puuid(params.at(0), params.at(1));break;
                         case S_BY_SUMMONER_ID:
+                            FORMAT("Teamfight Tactics | Summoner | By Summoner ID", "Routing", "Summoner ID")
                             response = this->underlying_client->Tft_Summoner.by_summoner_id(params.at(0), params.at(1));break;
                     } break;
                 default:

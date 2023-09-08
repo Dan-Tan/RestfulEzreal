@@ -36,8 +36,14 @@ namespace restfulEz {
             // Requests with a chain of dependecies
             std::queue<std::shared_ptr<BatchRequest>> linked_requests; 
 
+            std::string* recent_req_ptr = nullptr;
+            std::vector<std::string>* recent_param_names = nullptr;
+            std::vector<std::string>* recent_params = nullptr;
+
+            const std::function<void(const std::string&, const std::vector<std::string>&, const std::vector<PARAM_CONT>&)> update_display_func;
+
         public:
-            RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_directory);
+            RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_directory, std::function<void(const std::string&, const std::vector<std::string>&, const std::vector<PARAM_CONT>&)> func);
             ~RequestSender();
 
             void set_client(std::shared_ptr<client::RiotApiClient> client) {this->underlying_client = client;};

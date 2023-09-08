@@ -79,6 +79,8 @@
 #define SP_BY_SUMMONER_ID 0
 #define SP_FEATURED 1
 
+#define FORMAT(name, ...) {static const std::string req_name = name; static const std::vector<std::string> p_names = {__VA_ARGS__}; this->update_display_func(req_name, p_names, params);}
+
 namespace restfulEz {
 
     std::shared_ptr<LinkedInterface> LinkedInterface::make_linked_LOL(const int game, const int end_name, const int endpoint_method) {
@@ -301,73 +303,100 @@ namespace restfulEz {
             case CHAMPION_MASTERY: // Champion Mastery
                 switch (endpoint_method) {
                     case CM_BY_PUUID:
+                        FORMAT("League of Legends | Champion Mastery | By Puuid", "Routing", "By Puuid")
                         response = this->underlying_client->Champion_Mastery.by_summoner_id(params.at(0), params.at(1)); break;
                     case CM_BY_RIOT_ID:
+                        FORMAT("League of Legends | Champion Mastery | Summoner By Champion", "Routing", "Summoner ID", "Champion ID")
                         response = this->underlying_client->Champion_Mastery.by_summoner_by_champion(params.at(0), params.at(1), atoi(params.at(2))); break;
                     case CM_BY_GAME_BY_PUUID:
+                        FORMAT("League of Legends | Champion Mastery | By Summoner Top", "Routing", "Summoner ID")
                         response = this->underlying_client->Champion_Mastery.by_summoner_top(params.at(0), params.at(1), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                     case CM_SCORE_BY_SUMMONER:
+                        FORMAT("League of Legends | Champion Mastery | By Game", "Routing", "Game", "Puuid")
                         response = this->underlying_client->Champion_Mastery.scores_by_summoner(params.at(0), params.at(1)); break;
                 } break;
             case CHAMPION_ROTATION: // Champion Rotation
+                FORMAT("League of Legends | Champion Rotation | Rotation", "Routing")
                 response = this->underlying_client->Champion.rotations(params.at(0));break;
             case CLASH: // Clash
                 switch (endpoint_method) {
                     case CL_BY_SUMMONER_ID:
+                        FORMAT("League of Legends | Clash | By Summoner ID", "Routing", "Summoner ID")
                         response = this->underlying_client->Clash.by_summoner_id(params.at(0), params.at(1)); break;
                     case CL_BY_TEAM:
+                        FORMAT("League of Legends | Clash | By Team", "Routing", "Team")
                         response = this->underlying_client->Clash.by_team(params.at(0), params.at(1)); break;
                     case CL_TOURNAMENT_BY_TEAM:
+                        FORMAT("League of Legends | Clash | Tournament By Team", "Routing", "Team")
                         response = this->underlying_client->Clash.tournament_by_team(params.at(0), params.at(1)); break;
                     case CL_BY_TOURNAMENT:
+                        FORMAT("League of Legends | Clash | By Tournament", "Routing", "Tournament")
                         response = this->underlying_client->Clash.by_tournament(params.at(0), params.at(1)); break;
                 }break;
             case LEAGUE: // League
                 switch (endpoint_method) {
                     case CHALLENGER:
+                        FORMAT("League of Legends | League | Challenger", "Routing")
                         response = this->underlying_client->League.challenger(params.at(0), params.at(1)); break;
                     case GRANDMASTER:
+                        FORMAT("League of Legends | League | Grandmaster", "Routing")
                         response = this->underlying_client->League.grandmaster(params.at(0), params.at(1)); break;
                     case MASTER:
+                        FORMAT("League of Legends | League | Master", "Routing")
                         response = this->underlying_client->League.master(params.at(0), params.at(1)); break;
                     case L_BY_SUMMONER_ID:
+                        FORMAT("League of Legends | League | By Summoner ID", "Routing", "Summoner ID")
                         response = this->underlying_client->League.by_summoner_id(params.at(0), params.at(1)); break;
                     case L_BY_LEAGUE_ID:
+                        FORMAT("League of Legends | League | By League ID", "Routing", "League ID")
                         response = this->underlying_client->League.by_league_id(params.at(0), params.at(1)); break;
                     case L_SPECIFIC_LEAGUE:
+                        FORMAT("League of Legends | League | Specific League", "Routing", "Queue", "Division", "Tier")
                         response = this->underlying_client->League.specific_league(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break; 
                     case L_EXPERIMENTAL:
+                        FORMAT("League of Legends | League | League (Experimental)", "Routing", "Queue", "Division", "Tier")
                         response = this->underlying_client->League_Exp.entries(params.at(0), params.at(1), params.at(2), params.at(3), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                 }break;
             case CHALLENGES: // Challenges
                 switch (endpoint_method) {
                     case CH_CONFIGURATION:
+                        FORMAT("League of Legends | Challenges | Configuration", "Routing")
                         response = this->underlying_client->Lol_Challenges.config(params.at(0)); break;
                     case CH_PERCENTILES:
+                        FORMAT("League of Legends | Challenges | Percentiles", "Routing")
                         response = this->underlying_client->Lol_Challenges.percentiles(params.at(0)); break;
                     case CH_CH_CONFIGURATION:
+                        FORMAT("League of Legends | Challenges | Challenge Configuration", "Routing", "Challenge ID")
                         response = this->underlying_client->Lol_Challenges.challenge_config(params.at(0), atoi(params.at(1))); break;
                     case CH_CH_LEADERBOARD:
+                        FORMAT("League of Legends | Challenges | Challenge Leaderboard", "Routing", "Challenge ID", "Level")
                         response = this->underlying_client->Lol_Challenges.challenge_leaderboard(params.at(0), atoi(params.at(2)), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0)))); break;
                     case CH_CH_PERCENTILES:
+                        FORMAT("League of Legends | Challenges | Challenge Percentiles", "Routing", "Challenge ID")
                         response = this->underlying_client->Lol_Challenges.challenge_percentiles(params.at(0), atoi(params.at(1))); break;
                     case CH_BY_PUUID:
+                        FORMAT("League of Legends | Challenges | By Puuid", "Routing", "PUUID")
                         response = this->underlying_client->Lol_Challenges.by_puuid(params.at(0), params.at(1)); break;
                 }break;
             case STATUS: // Lol_Status
                 switch (endpoint_method) {
                     case V4:
+                        FORMAT("League of Legends | Status | v4", "Routing")
                         response = this->underlying_client->Lol_Status.v4(params.at(0)); break;
                     case V3:
+                        FORMAT("League of Legends | Status | v3", "Routing")
                         response = this->underlying_client->Lol_Status.v3(params.at(0)); break;
                 }break;
             case MATCH: // Match
                 switch (endpoint_method) {
                     case M_BY_MATCH_ID:
+                        FORMAT("League of Legends | Match | By Match ID", "Routing", "Match ID")
                         response = this->underlying_client->Match.by_match_id(params.at(0), params.at(1)); break;
                     case M_TIMELINE:
+                        FORMAT("League of Legends | Match | Timeline", "Routing", "Match ID")
                         response = this->underlying_client->Match.timeline(params.at(0), params.at(1)); break;
                     case M_BY_PUUID:
+                        FORMAT("League of Legends | Match | By Puuid", "Routing", "Puuid ID")
                         response = this->underlying_client->Match.by_puuid(params.at(0), params.at(1), 
                                 std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)),
                                 std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
@@ -380,21 +409,28 @@ namespace restfulEz {
             case SUMMONER: // Summoner
                 switch (endpoint_method) {
                     case S_BY_RSO_PUUID:
+                        FORMAT("League of Legends | Summoner | By RSO Puuid", "Routing", "RSO Puuid ID")
                         response = this->underlying_client->Summoner.by_rso_puuid(params.at(0), params.at(1)); break;
                     case S_BY_ACCOUNT_ID:
+                        FORMAT("League of Legends | Summoner | By Account ID", "Routing", "Account ID")
                         response = this->underlying_client->Summoner.by_account_id(params.at(0), params.at(1)); break;
                     case S_BY_NAME:
+                        FORMAT("League of Legends | Summoner | By Name", "Routing", "Name")
                         response = this->underlying_client->Summoner.by_name(params.at(0), params.at(1)); break;
                     case S_BY_PUUID:
+                        FORMAT("League of Legends | Summoner | By Puuid", "Routing", "PUUID")
                         response = this->underlying_client->Summoner.by_puuid(params.at(0), params.at(1)); break;
                     case S_BY_SUMMONER_ID:
+                        FORMAT("League of Legends | Summoner | By Summoner ID", "Routing", "Summoner ID")
                         response = this->underlying_client->Summoner.by_summoner_id(params.at(0), params.at(1)); break;
                 }break;
             case SPECTATOR: // Spectator
                 switch (endpoint_method) {
                     case SP_BY_SUMMONER_ID:
+                        FORMAT("League of Legends | Spectator | By Summoner ID", "Routing", "Summoner ID")
                         response = this->underlying_client->Spectator.by_summoner_id(params.at(0), params.at(1)); break;
                     case SP_FEATURED:
+                        FORMAT("League of Legends | Spectator | Featured", "Routing")
                         response = this->underlying_client->Spectator.featured_games(params.at(0)); break;
                 }break;
             default: // Catch Exception

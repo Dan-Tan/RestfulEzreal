@@ -22,6 +22,8 @@
 // ###############
 #define STATUS 3
 
+#define FORMAT(name, ...) {static const std::string req_name = name; static const std::vector<std::string> p_names = {__VA_ARGS__}; this->update_display_func(req_name, p_names, params);}
+
 namespace restfulEz {
 
     std::shared_ptr<LinkedInterface> LinkedInterface::make_linked_VAL(const int game, const int end_name, const int endpoint_method) {
@@ -103,21 +105,27 @@ namespace restfulEz {
 
         switch (endpoint) {
             case CONTENT:
+                FORMAT("Valorant | Content", "Routing")
                 response = this->underlying_client->Val_Content.content(params.at(0), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
             case MATCH:
                 switch (endpoint_method) {
                     case BY_MATCH:
+                        FORMAT("Valorant | Match | By Match ID", "Routing", "Match ID")
                         response = this->underlying_client->Val_Match.by_match(params.at(0), params.at(1));break;
                     case BY_PUUID:
+                        FORMAT("Valorant | Match | By Puuid", "Routing", "PUUID")
                         response = this->underlying_client->Val_Match.by_puuid(params.at(0), params.at(1));break;
                     case BY_QUEUE:
+                        FORMAT("Valorant | Match | By Match ID", "Routing", "Match ID")
                         response = this->underlying_client->Val_Match.by_queue(params.at(0), params.at(1));break;
                     default:
                         throw std::invalid_argument("Invalid Endpoint Method Index Given");
                 } break;
             case RANKED:
+                FORMAT("Valorant | Ranked | By Act", "Routing", "Act")
                 response = this->underlying_client->Val_Ranked.by_act(params.at(0), params.at(1), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
             case STATUS:
+                FORMAT("Valorant | Status | v1", "Routing")
                 response = this->underlying_client->Val_Status.platform_data(params.at(0));break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index Given");
