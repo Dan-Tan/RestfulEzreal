@@ -107,19 +107,6 @@ namespace restfulEz {
         this->render_client_status();
     }
 
-    void RestfulEzreal::update_recent_request(const std::string& req_name, const std::vector<std::string>& param_names, const std::vector<PARAM_CONT>& param_inputs) {
-        if (this->param_descriptions.size() != 0) {
-            this->param_descriptions.clear();
-        }
-        this->recent_request = req_name;
-        this->recent_request.push_back('\0');
-        D((param_names.size() == param_inputs.size() ? "" : "Param names and param inputs different size on message display (RestfulEzreal::update_recent_request)"));
-        for (int i = 0; i <  param_names.size(); i++) {
-            this->param_descriptions.emplace_back(param_names[i] + ": " + std::string(param_inputs[i].param));
-            this->param_descriptions.back().push_back('\0'); // ensure null termination just in case for ImGui
-        }
-    }
-
     static void render_recent_request(const std::string& req_name, const std::vector<std::string>& param_descriptions) {
         ImGui::Text("Most Recent Request");
         ImGui::Text(req_name.data()); // null terminated
@@ -213,7 +200,7 @@ namespace restfulEz {
             ImGui::Text("API-KEY given was not valid or unable to be validated, please check your connection or RIOT developer website");
         }
 
-        render_recent_request(this->recent_request, this->param_descriptions);
+        render_recent_request(this->request_sender->recent_request, this->request_sender->recent_params);
 
         ImGui::End();
 
@@ -289,7 +276,7 @@ namespace restfulEz {
             log_path = doc["log-path"].get_string().value();
 
             this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, log_path, report_level, doc["verbosity"].get_bool().value());
-            this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output, std::bind_front(&RestfulEzreal::update_recent_request, this));
+            this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
             this->batch_group->set_sender(this->request_sender);
     }
 
@@ -344,7 +331,7 @@ namespace restfulEz {
             if (ImGui::Button("Submit")) { 
                 write_config_file(api_key, path_to_log, path_to_output, verbosity, level_);
                 this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
-                this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output, std::bind_front(&RestfulEzreal::update_recent_request, this));
+                this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
                 this->batch_group->set_sender(this->request_sender);
                 this->_path_to_output = path_to_output;
                 ImGui::CloseCurrentPopup();

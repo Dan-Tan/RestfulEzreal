@@ -14,9 +14,8 @@
 
 namespace restfulEz {
 
-    RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir, 
-            std::function<void(const std::string&, const std::vector<std::string>&, const std::vector<PARAM_CONT>&)> func) 
-        : output_directory(output_dir), update_display_func(func) {
+    RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir)
+        : output_directory(output_dir) {
         this->worker_thread = std::thread([this] {this->worker();});
         this->underlying_client = client;
         std::filesystem::create_directories(this->output_directory);
@@ -70,9 +69,63 @@ namespace restfulEz {
         }
     }
 
+    static const char* GAMES_[] = { "Riot", "League of Legends", "TeamfightTactics", "Legends of Runeterra", "Valorant"};
+
+    static const char GAME_ENDPOINTS_[5][9][18] = {
+        { "Account" },
+        { "Champion Mastery", "Champion Rotation", "Clash", "League", "Challenges", "Status", "Match", "Summoner", "Spectator" },
+        { "League", "Match", "Status", "Summoner" },
+        { "Match", "Ranked", "Status" },
+        { "Content", "Match", "Ranked", "Status" }
+    };
+
+
+    static const char ENDPOINT_METHODS_[5][9][7][24] = {
+    {
+        {"By Puuid", "By Riot ID", "By Game"}
+    },
+    {
+        { "By Summoner ID", "By Summoner By Champion", "Top By Summoner", "Scores By Summoner" },
+        { "Rotation" },
+        {"By Summoner ID", "By Team", "Tourament By Team", "By Tournament"},
+        {"Challenger", "Grandmaster", "Master", "By Summoner ID", "By League ID", "Specific League", "Experimental"},
+        {"Configuration", "Percentiles", "Challenge Configuration", "Challenge Leaderboard", "Challenge Percentiles", "By Puuid"},
+        {"v4 (recommended)", "v3"},
+        {"By Match ID", "Timeline", "By Puuid"},
+        {"By RSO Puuid", "By Account ID", "By Name", "By Puuid", "By Summoner ID"},
+        {"By Summoner ID", "Featured Games"}
+    },
+    {
+        { "Challenger", "Grandmaster", "Master", "By Summoner ID", "By League ID", "Queue Top", "By Tier Division"},
+        { "By Puuid", "By Match ID"},
+        {"v1"},
+        {"By Account", "By Name", "By Puuid", "By Summoner ID"}
+    },
+    {
+        { "By Puuid", "By Match ID"},
+        { "Leaderboards"},
+        {"v1"}
+    },
+    {
+        { "Content"},
+        { "By Match ID", "By Puuid", "By  Queue"},
+        {"By Act"},
+        {"Status"}
+    }
+    };
+
     using json_ptr = std::unique_ptr<std::vector<char>>;
 
     json_ptr RequestSender::Send_Request(request& task) {
+
+        this->recent_request = std::string(GAMES_[task._game]) + " | " + std::string(GAME_ENDPOINTS_[task._game][task._endpoint]) + " | " + std::string(ENDPOINT_METHODS_[task._game][task._endpoint][task._endpoint_method]);
+        if (this->recent_params.size() != 0) {
+            this->recent_params.clear();
+        }
+        for (PARAM_CONT& param : task.params) {
+            this->recent_params.emplace_back(param.param);
+        }
+
         json_ptr response;
         switch (task._game) {
             case 0: // RIOT

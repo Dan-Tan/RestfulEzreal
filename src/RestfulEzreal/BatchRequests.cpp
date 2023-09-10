@@ -100,7 +100,7 @@ namespace restfulEz {
             }
         }
         catch (std::out_of_range &ex) {
-            throw std::out_of_range("Improper construction of links and dependencies, check constructor, or parent request not sent yet");
+            std::cerr <<  "Improper construction of links and dependencies, check constructor, or parent request not sent yet. \n ERROR: " << ex.what() << std::endl;;
         }
         catch (std::runtime_error &ex) {
             // user passed invalid json keys
@@ -117,7 +117,7 @@ namespace restfulEz {
             return true;
         }
         catch (std::out_of_range &ex) {
-            throw std::out_of_range((std::string("Improper construction of links and dependencies, check construction")+ std::string(ex.what())).c_str());
+            std::cerr <<  "Improper construction of links and dependencies, check construction. \nERROR: " << ex.what() << std::endl;
         }
         catch(std::runtime_error &ex) {
             // user passed invalid json keys
@@ -180,7 +180,8 @@ namespace restfulEz {
             return true;
         }
         catch (std::out_of_range &ex) {
-            throw std::out_of_range((std::string("Improper construction of links and dependencies, check construction")+ std::string(ex.what())).c_str());
+            std::cerr << "Improper construction of links and dependencies, check construction. \nError: " << ex.what() << std::endl;
+            return false;
         }
         catch(std::runtime_error &ex) {
             // user passed invalid json keys
@@ -406,9 +407,13 @@ namespace restfulEz {
                 }
                 if (child->_node->unsent_request->ready()) {
                     D("Inserting Child: (game: " << child->_node->unsent_request->_game << ", endpoint: " << child->_node->unsent_request->_endpoint << ", endpoint_method: "  << child->_node->unsent_request->_endpoint_method << ")");
-                    child->_node->unsent_request->fill_request();
-                    child->_node->unsent_request->update_base();
-                    this->parent_requests->insert(child);
+                    try {
+                        child->_node->unsent_request->fill_request();
+                        child->_node->unsent_request->update_base();
+                        this->parent_requests->insert(child);
+                    } catch (simdjson::simdjson_error& err) {
+                        std::cerr << "Json parsing error" << err.what() << std::endl;
+                    }
                 }
             }
             D("Removing executed request and inserting all ready dependent requests");
