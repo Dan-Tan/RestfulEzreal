@@ -5,6 +5,7 @@
 #include <array>
 #include <json/json.h>
 #include "RestfulEzreal.h"
+#include "imgui.h"
 #include "simdjson.h"
 
 #define ROOT_DIR ../fonts
@@ -87,10 +88,11 @@ namespace restfulEz {
         ImGui::ShowMetricsWindow();
 #endif
 
-        static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration;
-        static bool open = true;
-        window_flags |= ImGuiWindowFlags_NoTitleBar;
-        ImGui::Begin("RestfulEzreal", &open, window_flags);
+        static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
+        static ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(0.1225 * io.DisplaySize.x, 0));
+        ImGui::SetNextWindowSize(ImVec2((1-0.1225) * io.DisplaySize.x, io.DisplaySize.y));
+        ImGui::Begin("RestfulEzreal", NULL, window_flags);
 
         // We want to check which page is selected on the nav bar and render the selected page
         if (!this->_underlying_client) { this->config_check(); };
@@ -105,6 +107,113 @@ namespace restfulEz {
 
         // In a seperate window render the status of the client.
         this->render_client_status();
+    }
+
+    static inline bool render_button_text(bool* hovered, const char* txt) {
+        bool pressed = false;
+        bool pop = false;
+        static const ImVec4 active_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+        if (*hovered) {
+            pop = true;
+            ImGui::PushStyleColor(ImGuiCol_Text, active_col);
+        }
+        ImGui::Text(txt);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::SameLine();
+        ImGui::Text(" ~ ");
+        ImGui::PopStyleColor();
+
+        ImGui::SameLine();
+        pressed = ImGui::Button(">");
+        if (pop) {
+            ImGui::PopStyleColor();
+        }
+        if (ImGui::IsItemHovered()) {
+            *hovered = true;
+        } else {
+            *hovered = false;
+        }
+        return pressed;
+    }
+
+    void RestfulEzreal::render_welcome() {
+
+        static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
+        static ImVec2 disp_size = ImGui::GetIO().DisplaySize;
+        static ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(io.DisplaySize);
+
+        ImGui::Begin("Welcome", NULL, window_flags);
+
+        ImGui::PushFont(io.Fonts->Fonts[1]);
+        static const ImVec2 sze = ImGui::CalcTextSize("RESTfulEzreal;");
+        static const ImVec2 half_sze = ImVec2(sze.x * 0.5, sze.y * 0.5);
+        static const ImVec2 title_pos = ImVec2(io.DisplaySize.x * 0.333 - half_sze.x, io.DisplaySize.y * 0.25 - half_sze.y); 
+        ImGui::SetCursorPos(title_pos);
+        ImGui::Text("RESTfulEzreal;");
+        ImGui::PopFont();
+
+        ImGui::PushFont(io.Fonts->Fonts[2]);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
+        ImGui::SetCursorPos(ImVec2(title_pos.x, title_pos.y + 2 *  half_sze.y));
+        ImGui::Text("A RESTFUL API CLIENT WITH A GRAPHICAL USER INTEFACE");
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+
+        
+        ImGui::PushFont(io.Fonts->Fonts[0]);
+        static bool hovered_button[5] = { false , false , false , false , false};
+        static const float txt_size[7] = {ImGui::CalcTextSize("CONFIGURE    from existing").x, ImGui::CalcTextSize("from existing").x, ImGui::CalcTextSize("from custom").x, ImGui::CalcTextSize("new").x, ImGui::CalcTextSize("ABOUT").x, ImGui::CalcTextSize("ACKNOWLEDGEMENTS").x, ImGui::CalcTextSize(" ").x} ;
+        static const float last_ali_col = title_pos.x + ImGui::CalcTextSize("Configure    from existing ").x;
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
+        static float lne_height = ImGui::GetTextLineHeightWithSpacing();
+        ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[0], title_pos.y + 2*  sze.y + 1.5 * lne_height));
+        if (hovered_button[0] || hovered_button[1] || hovered_button[2] ) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+        }
+        ImGui::Text("CONFIGURE ");
+        ImGui::SameLine();
+        if (hovered_button[0] || hovered_button[1] || hovered_button[2] ) {
+            ImGui::PopStyleColor();
+        }
+        ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[1], title_pos.y + 2*  sze.y + 1.5 * lne_height));
+        render_button_text(&hovered_button[0], " from existing");
+
+        ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[1], title_pos.y + 2*  sze.y + 3 * lne_height));
+        render_button_text(&hovered_button[1], " from custom  ");
+
+        ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[1], title_pos.y + 2*  sze.y + 4.5 * lne_height));
+        render_button_text(&hovered_button[2], " new          ");
+
+        ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[0], title_pos.y + 2*  sze.y + 9 * lne_height));
+        if (hovered_button[3]) { ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); }
+        ImGui::Text("ABOUT");
+        ImGui::SameLine();
+        if (hovered_button[3]) { ImGui::PopStyleColor(); }
+
+        ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[6], title_pos.y + 2*  sze.y + 9 * lne_height));
+        render_button_text(&hovered_button[3], "  ");
+
+        ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[0], title_pos.y + 2*  sze.y + 7.5 * lne_height));
+        if (hovered_button[4]) { ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); }
+        ImGui::Text("ACKNOWLEDGEMENTS");
+        ImGui::SameLine();
+        if (hovered_button[4]) { ImGui::PopStyleColor(); }
+
+        ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[6], title_pos.y + 2*  sze.y + 7.5 * lne_height));
+        render_button_text(&hovered_button[4], "  ");
+
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+
+        ImGui::End();
+    }
+
+    void RestfulEzreal::render_welcome_config() {
+
     }
 
     static void render_recent_request(const std::string& req_name, const std::vector<std::string>& param_descriptions) {

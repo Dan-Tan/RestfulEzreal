@@ -678,10 +678,9 @@ namespace restfulEz {
             this->window_initiated = true;
         }
 
-        ImVec2 available = ImGui::GetContentRegionAvail();
         if (this->window_initiated) {
 
-            if (!this->movement_lock && ImGui::IsMouseHoveringRect(this->windowposition, ImVec2(this->windowposition.x + 0.25 * available.x, this->windowposition.y + 0.25 * available.y), true)) {
+            if (!this->movement_lock && ImGui::IsMouseHoveringRect(this->windowposition, ImVec2(this->windowposition.x + 0.25 * default_size.x, this->windowposition.y + this->window_height), true)) {
                 this->dragging = true;
             }
             if (this->dragging && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {

@@ -1,4 +1,4 @@
-# RESTFUL EZREAL
+# RESTFUL EZREAL (completely out of date)
 
 I know it doesn't rhyme
 

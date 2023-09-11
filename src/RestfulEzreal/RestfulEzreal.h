@@ -44,6 +44,8 @@ namespace restfulEz {
             RestfulEzreal(current_page* on_display);
 
             void OnUIRender();
+            void render_welcome();
+            void render_welcome_config();
             QUERY_FORM* _next_request = nullptr;
 
         private:
