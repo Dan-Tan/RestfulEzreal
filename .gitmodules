@@ -1,6 +1,3 @@
 [submodule "riot-cpp"]
 	path = riot-cpp
 	url = git@github.com:Dan-Tan/riot-cpp.git
-[submodule "Walnut"]
-	path = Walnut
-	url = git@github.com:valerioformato/Walnut.git
