@@ -166,6 +166,7 @@ namespace restfulEz {
             bool iterative[N] = { 0 };
             std::vector<std::size_t> optional_to_send; 
             bool configuring = false;
+            std::vector<std::string> p_name_id;
 
             // let user know if the form is finished
             bool ready = false;
@@ -323,6 +324,9 @@ namespace restfulEz {
         for (int i = 0; i < N-1; i++) {
             memset(this->iter_limits[i], 0, 8);
         }
+        for (P_NAME& p_n : this->_param_names) {
+            this->p_name_id.emplace_back(std::string("##") + std::string(p_n.name));
+        }
         this->display_form.emplace_back("");
     }
 
@@ -374,7 +378,11 @@ namespace restfulEz {
 
     template<std::size_t N>
     void LinkedForm<N>::render_routing() {
-        ImGui::InputText(this->_param_names[0], this->_params_in_form[0].param, 256, this->_type_ordering[0]);
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
+        ImGui::Text("ROUTING : ");
+        ImGui::SameLine();
+        ImGui::InputText(this->p_name_id[0].data(), this->_params_in_form[0].param, 256, this->_type_ordering[0]);
+        ImGui::PopFont();
     }
     
     template<std::size_t N>
@@ -389,9 +397,11 @@ namespace restfulEz {
         static char _iter_id[] = "Iterative##0";
         _iter_id[11] = (char)ind;
         if (this->linked[ind]) {
+
             ImGui::Checkbox(_iter_id, &this->iterative[ind]);
             static char _link_but_id[]  = "Link Parent##0";
             _link_but_id[13] = (char) ind;
+
             if (ImGui::Button("Link Parent")) {
                 this->next_index = ind;
                 linking = true;
@@ -546,18 +556,21 @@ namespace restfulEz {
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        
+        bool open = true;
 
-        if (ImGui::BeginPopupModal(this->popup_id.data(), NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (ImGui::Button("Close")) {
-                this->on_close_popup();
-                this->configuring = false;
-            }
+        if (ImGui::BeginPopupModal(this->popup_id.data(), &open, ImGuiWindowFlags_AlwaysAutoResize)) {
             this->render_routing();
             linking = this->render_all_fields();
             if (this->_accepts_optional) {
                 this->render_optionals();
             }
             ImGui::EndPopup();
+        }
+
+        if (!open) {
+            this->on_close_popup();
+            this->configuring = false;
         }
         return linking;
     }

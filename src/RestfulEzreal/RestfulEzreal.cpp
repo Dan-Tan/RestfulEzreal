@@ -8,6 +8,8 @@
 #include "RestfulEzreal.h"
 #include "simdjson.h"
 
+#define ROOT_DIR ../fonts
+
 #ifndef CONFIG_FILE_PATH
 #define CONFIG_FILE_PATH "./EzrealRunes.json"
 #else
@@ -79,7 +81,17 @@ namespace restfulEz {
         this->batch_group = std::make_shared<BatchForm>();
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
         set_colours();
+
     };
+
+    void RestfulEzreal::OnAttach() {
+        ImGuiIO& io = ImGui::GetIO();
+        io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-ExtraLight.ttf", 20.0f);
+        io.Fonts->AddFontDefault();
+        io.Fonts->Build();
+
+        io.Fonts->Fonts[1]->Scale = 2.0f / io.Fonts->Fonts[0]->FontSize;
+    }
 
     void RestfulEzreal::OnUIRender() {
         // Main render function for the user interface
