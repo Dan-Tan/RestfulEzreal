@@ -1,7 +1,6 @@
 #pragma once
 #include "client/client.h"
 #include "json/json.h"
-#include "Walnut/Application.h"
 #include "RequestQueue.h"
 #include "QueryForm.h"
 #include <fstream>
@@ -9,6 +8,7 @@
 #include <array>
 #include <string>
 #include <vulkan/vulkan_core.h>
+#include <imgui.h>
 
 #define _NO_FLAG ImGuiInputTextFlags_None
 #define _DEC_FLAG ImGuiInputTextFlags_CharsDecimal
@@ -24,7 +24,7 @@ enum current_page {
 
 namespace restfulEz {
 
-    class RestfulEzreal : public Walnut::Layer
+    class RestfulEzreal
     {
         private:
             std::shared_ptr<client::RiotApiClient> _underlying_client = nullptr;
@@ -43,8 +43,7 @@ namespace restfulEz {
         public:
             RestfulEzreal(current_page* on_display);
 
-            void OnUIRender() override;
-            void OnAttach() override;
+            void OnUIRender();
             QUERY_FORM* _next_request = nullptr;
 
         private:

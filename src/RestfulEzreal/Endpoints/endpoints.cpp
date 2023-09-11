@@ -1,4 +1,3 @@
-#include "Walnut/Application.h"
 #include <vector>
 #include <array>
 #include <memory>

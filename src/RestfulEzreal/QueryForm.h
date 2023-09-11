@@ -1,7 +1,6 @@
 #pragma once
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "Walnut/Application.h"
 #include "BatchRequests.h"
 #include "RequestQueue.h"
 #include <ranges>

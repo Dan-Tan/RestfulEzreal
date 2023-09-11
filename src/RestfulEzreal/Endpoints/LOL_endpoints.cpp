@@ -1,4 +1,3 @@
-#include "Walnut/Application.h"
 #include "../RequestQueue.h"
 #include "../RestfulEzreal.h"
 #include <array>

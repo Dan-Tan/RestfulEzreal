@@ -1,4 +1,3 @@
-#include "Walnut/Application.h"
 #include <iostream>
 #include <thread>
 #include <regex>
@@ -57,8 +56,6 @@ namespace restfulEz {
         colors[ImGuiCol_TabActive]              = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
         colors[ImGuiCol_TabUnfocused]           = ImVec4(0.13f, 0.13f, 0.13f, 0.97f);
         colors[ImGuiCol_TabUnfocusedActive]     = ImVec4(0.42f, 0.42f, 0.42f, 1.00f);
-        colors[ImGuiCol_DockingPreview]         = ImVec4(0.26f, 0.59f, 0.98f, 0.70f);
-        colors[ImGuiCol_DockingEmptyBg]         = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
         colors[ImGuiCol_PlotLines]              = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
         colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
         colors[ImGuiCol_PlotHistogram]          = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
@@ -83,15 +80,6 @@ namespace restfulEz {
         set_colours();
 
     };
-
-    void RestfulEzreal::OnAttach() {
-        ImGuiIO& io = ImGui::GetIO();
-        io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-ExtraLight.ttf", 20.0f);
-        io.Fonts->AddFontDefault();
-        io.Fonts->Build();
-
-        io.Fonts->Fonts[1]->Scale = 2.0f / io.Fonts->Fonts[0]->FontSize;
-    }
 
     void RestfulEzreal::OnUIRender() {
         // Main render function for the user interface
