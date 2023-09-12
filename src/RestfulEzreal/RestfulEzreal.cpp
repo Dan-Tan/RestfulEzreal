@@ -6,7 +6,9 @@
 #include <json/json.h>
 #include "RestfulEzreal.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "simdjson.h"
+#include "utils/utils.h"
 
 #define ROOT_DIR ../fonts
 
@@ -109,7 +111,7 @@ namespace restfulEz {
         this->render_client_status();
     }
 
-    static inline bool render_button_text(bool* hovered, const char* txt) {
+    static bool render_button_text(bool* hovered, const char* txt, const char* ID) {
         bool pressed = false;
         bool pop = false;
         static const ImVec4 active_col = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -125,7 +127,7 @@ namespace restfulEz {
         ImGui::PopStyleColor();
 
         ImGui::SameLine();
-        pressed = ImGui::Button(">");
+        pressed = ImGui::Button(ID);
         if (pop) {
             ImGui::PopStyleColor();
         }
@@ -137,36 +139,43 @@ namespace restfulEz {
         return pressed;
     }
 
-    void RestfulEzreal::render_welcome() {
+    int RestfulEzreal::render_welcome() {
+
 
         static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
-        static ImVec2 disp_size = ImGui::GetIO().DisplaySize;
         static ImGuiIO& io = ImGui::GetIO();
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         ImGui::SetNextWindowSize(io.DisplaySize);
 
         ImGui::Begin("Welcome", NULL, window_flags);
-
+        
+        // DISPLAY TITLE RESTFULEZREAL
         ImGui::PushFont(io.Fonts->Fonts[1]);
-        static const ImVec2 sze = ImGui::CalcTextSize("RESTfulEzreal;");
-        static const ImVec2 half_sze = ImVec2(sze.x * 0.5, sze.y * 0.5);
-        static const ImVec2 title_pos = ImVec2(io.DisplaySize.x * 0.333 - half_sze.x, io.DisplaySize.y * 0.25 - half_sze.y); 
-        ImGui::SetCursorPos(title_pos);
-        ImGui::Text("RESTfulEzreal;");
-        ImGui::PopFont();
+        const ImVec2 sze = ImGui::CalcTextSize("RESTfulEzreal;");
+        const ImVec2 half_sze = ImVec2(sze.x * 0.5, sze.y * 0.5);
 
+        ImVec2 title_pos = ImVec2(io.DisplaySize.x * 0.5 - half_sze.x, io.DisplaySize.y * 0.25 - half_sze.y); 
+        ImGui::SetCursorPos(title_pos);
+        static re_utils::FBF_STRING_16 title = re_utils::create_fbf_string<16, re_utils::FBF_STRING_16>("RESTfulEzreal;", 2);
+        re_utils::fbf_text(title);
+        //ImGui::Text("RESTfulEzreal;");
+
+        ImGui::PopFont();
+        
+        // DISPLAY SUBTITLE
         ImGui::PushFont(io.Fonts->Fonts[2]);
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
         ImGui::SetCursorPos(ImVec2(title_pos.x, title_pos.y + 2 *  half_sze.y));
         ImGui::Text("A RESTFUL API CLIENT WITH A GRAPHICAL USER INTEFACE");
         ImGui::PopStyleColor();
         ImGui::PopFont();
-
+        
+        static int start_up_type = -1;
         
         ImGui::PushFont(io.Fonts->Fonts[0]);
         static bool hovered_button[5] = { false , false , false , false , false};
-        static const float txt_size[7] = {ImGui::CalcTextSize("CONFIGURE    from existing").x, ImGui::CalcTextSize("from existing").x, ImGui::CalcTextSize("from custom").x, ImGui::CalcTextSize("new").x, ImGui::CalcTextSize("ABOUT").x, ImGui::CalcTextSize("ACKNOWLEDGEMENTS").x, ImGui::CalcTextSize(" ").x} ;
-        static const float last_ali_col = title_pos.x + ImGui::CalcTextSize("Configure    from existing ").x;
+        static const float txt_size[7] = {ImGui::CalcTextSize("CONFIGURE    from existing").x, ImGui::CalcTextSize("from existing").x, ImGui::CalcTextSize("from custom").x, ImGui::CalcTextSize("new").x, ImGui::CalcTextSize("ABOUT").x, ImGui::CalcTextSize("SOURCE").x, ImGui::CalcTextSize(" ").x} ;
+        const float last_ali_col = title_pos.x + ImGui::CalcTextSize("Configure    from existing ").x;
 
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
         static float lne_height = ImGui::GetTextLineHeightWithSpacing();
@@ -179,14 +188,15 @@ namespace restfulEz {
         if (hovered_button[0] || hovered_button[1] || hovered_button[2] ) {
             ImGui::PopStyleColor();
         }
+
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[1], title_pos.y + 2*  sze.y + 1.5 * lne_height));
-        render_button_text(&hovered_button[0], " from existing");
+        if (render_button_text(&hovered_button[0], " from existing", ">##1")) { start_up_type = 1; };
 
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[1], title_pos.y + 2*  sze.y + 3 * lne_height));
-        render_button_text(&hovered_button[1], " from custom  ");
+        if (render_button_text(&hovered_button[1], " from custom  ", ">##3")) { start_up_type = 2; };
 
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[1], title_pos.y + 2*  sze.y + 4.5 * lne_height));
-        render_button_text(&hovered_button[2], " new          ");
+        if (render_button_text(&hovered_button[2], " new          ", ">##4")) { start_up_type = 3; };
 
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[0], title_pos.y + 2*  sze.y + 9 * lne_height));
         if (hovered_button[3]) { ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); }
@@ -195,25 +205,27 @@ namespace restfulEz {
         if (hovered_button[3]) { ImGui::PopStyleColor(); }
 
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[6], title_pos.y + 2*  sze.y + 9 * lne_height));
-        render_button_text(&hovered_button[3], "  ");
+        if (render_button_text(&hovered_button[3], "  ", ">##5")) { start_up_type = 4; };
 
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[0], title_pos.y + 2*  sze.y + 7.5 * lne_height));
         if (hovered_button[4]) { ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); }
-        ImGui::Text("ACKNOWLEDGEMENTS");
+        ImGui::Text("SOURCE");
         ImGui::SameLine();
         if (hovered_button[4]) { ImGui::PopStyleColor(); }
 
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[6], title_pos.y + 2*  sze.y + 7.5 * lne_height));
-        render_button_text(&hovered_button[4], "  ");
+        if (render_button_text(&hovered_button[4], "  ", ">##6")) { start_up_type = 5; };
 
         ImGui::PopStyleColor();
         ImGui::PopFont();
 
         ImGui::End();
+
+        return start_up_type;
     }
 
     void RestfulEzreal::render_welcome_config() {
-
+        this->conf_form<false>();
     }
 
     static void render_recent_request(const std::string& req_name, const std::vector<std::string>& param_descriptions) {
@@ -388,6 +400,147 @@ namespace restfulEz {
             this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
             this->batch_group->set_sender(this->request_sender);
     }
+    
+    template<bool in_popup>
+    static void render_field(const std::size_t write_size, char* to_write, const char* title, const char* ID, const ImGuiInputFlags input_flag, bool* active, const float x_align) {
+        /*
+         * write_size - size of text buffer for ImGui
+         * to_write   - char to write to
+         * title      - title of field
+         * ID         - FORM ID
+         * active     - pointer to bool whether to change col
+         * x_align    - float to align all fields to
+         */
+
+
+        static ImGuiIO& io = ImGui::GetIO();
+
+        ImGui::PushFont(io.Fonts->Fonts[0]);
+        if constexpr (!in_popup) { ImGui::SetCursorPosX(x_align); } // dont align in popups only title
+        if (*active) { ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); }
+        ImGui::Text(title);
+        ImGui::PopFont();
+
+        ImGui::PushFont(io.Fonts->Fonts[3]);
+        if constexpr (!in_popup) { 
+            ImGui::SetCursorPosX(x_align); 
+            static bool frst = true;
+            static float txt_width;
+            if (frst) {
+                ImGui::PushFont(io.Fonts->Fonts[1]); // width of title 
+                txt_width = ImGui::CalcTextSize("RESTfulEzreal;").x;
+                ImGui::PopFont();
+            }
+            ImGui::SetNextItemWidth(io.DisplaySize.x * 0.2 - (x_align - io.DisplaySize.x * 0.5) + txt_width * 0.5);
+        }
+        ImGui::InputText(ID, to_write, write_size, input_flag);
+        ImGui::PopFont();
+        if (*active) { ImGui::PopStyleColor(); }
+        if (ImGui::IsItemActive()) {
+            *active = true;
+        } else {
+            *active = false;
+        }
+    }
+    
+    template<bool in_popup>
+    bool RestfulEzreal::conf_form() {
+        static char api_key[256] = "";
+        static char path_to_log[64] = "";
+        static char path_to_output[64] = "";
+        static bool verbosity = false;
+        static bool selected[5] = {};
+
+        static bool submit = false;
+
+        static ImGuiIO& io = ImGui::GetIO();
+        
+        // computing align value
+        float x_ali;
+        float y_pos;
+        static ImVec2 sze;
+        static float lne_height;
+        if constexpr (!in_popup) {
+            static bool frst = true;
+            if (frst) {
+                ImGui::PushFont(io.Fonts->Fonts[1]);
+                sze = ImGui::CalcTextSize("RESTfulEzreal;");
+                ImGui::PopFont();
+                ImGui::PushFont(io.Fonts->Fonts[0]);
+                lne_height = ImGui::GetTextLineHeightWithSpacing();
+                ImGui::PopFont();
+                frst = false;
+            }
+            ImVec2 title_pos = ImVec2(io.DisplaySize.x * 0.3 - 0.5 * sze.x, io.DisplaySize.y * 0.25 - 0.5 * sze.y); 
+            y_pos = title_pos.y + 2 * sze.y + 0.5 * lne_height;
+            x_ali = io.DisplaySize.x  - title_pos.x - sze.x;
+            ImGui::SetCursorPosY(y_pos);
+        } else {
+            x_ali = 1.0f;
+        }
+        
+        // highlight array
+        static bool highlight[3] = { false, false, false };
+        //render_fields;
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f)); // dull color
+        render_field<in_popup>(256, api_key,        "API-KEY:",     "##API-KEY", ImGuiInputTextFlags_None, &highlight[0], x_ali);
+        render_field<in_popup>(64,  path_to_log,    "LOG PATH:",    "##LogPath", ImGuiInputTextFlags_None, &highlight[1], x_ali);
+        render_field<in_popup>(256, path_to_output, "OUTPUT PATH:", "##OutPath", ImGuiInputTextFlags_None, &highlight[2], x_ali);
+        ImGui::PopStyleColor();
+
+        static logging::LEVEL level_ = logging::LEVEL::INFO;
+        
+        ImGui::PushFont(io.Fonts->Fonts[0]);
+        if constexpr (!in_popup) {ImGui::SetCursorPosX(x_ali);}
+        float context_width = 0.0f;
+        if constexpr (!in_popup) { 
+            context_width = io.DisplaySize.x * 0.2 - (x_ali - io.DisplaySize.x * 0.5) + sze.x * 0.5;
+        };
+        if (ImGui::BeginTable("Logging Level", 5, ImGuiTableFlags_NoSavedSettings, ImVec2(context_width, 0.0f), context_width)) {
+
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable("DEBUG",    level_ == logging::LEVEL::DEBUG)) {
+                level_ = logging::LEVEL::DEBUG;
+            };
+
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable("INFO",     level_ == logging::LEVEL::INFO)) {
+                level_ = logging::LEVEL::INFO;
+            };
+
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable("WARNING",  level_ == logging::LEVEL::WARNING)) {
+                level_ = logging::LEVEL::WARNING;
+            }; 
+
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable("ERRORS",   level_ == logging::LEVEL::ERRORS)) {
+                level_ = logging::LEVEL::ERRORS;
+            }; 
+
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable("CRITICAL", level_ == logging::LEVEL::CRITICAL)) {
+                level_ = logging::LEVEL::CRITICAL;
+            }; 
+
+            ImGui::EndTable();
+        }
+        ImGui::PopFont();
+
+        if constexpr (!in_popup) { ImGui::SetCursorPosX(x_ali); };
+        ImGui::PushFont(io.Fonts->Fonts[0]);
+        if (ImGui::Button("Submit")) { 
+            write_config_file(api_key, path_to_log, path_to_output, verbosity, level_);
+            this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
+            this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
+            this->batch_group->set_sender(this->request_sender);
+            this->_path_to_output = path_to_output;
+            submit = true;
+        }
+        ImGui::PopFont();
+        return submit;
+
+    }
 
     bool RestfulEzreal::configure_new_client(bool allow_close) {
 
@@ -398,53 +551,9 @@ namespace restfulEz {
         
         bool unused_open = true;
         if (ImGui::BeginPopupModal("Configure Client", allow_close ? &unused_open : NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            static char api_key[256] = "";
-            static char path_to_log[64] = "";
-            static char path_to_output[64] = "";
-            static bool verbosity = false;
-            static bool selected[5] = {};
-
-            static bool submit = false;
-
-            static logging::LEVEL level_ = logging::LEVEL::INFO;
-
-            ImGui::InputText("API-KEY", api_key, 256);
-            ImGui::InputText("OUTPUT DIRECTORY", path_to_output, 64);
-            ImGui::InputText("PATH TO LOGFILE", path_to_log, 64);
-
-            if (ImGui::BeginTable("Logging Level", 5, ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings)) {
-
-                ImGui::TableNextColumn();
-                if (ImGui::Selectable("DEBUG", level_ == logging::LEVEL::DEBUG)) {
-                    level_ = logging::LEVEL::DEBUG;
-                }; // FIXME-TABLE: Selection overlap
-                ImGui::TableNextColumn();
-                if (ImGui::Selectable("INFO", level_ == logging::LEVEL::INFO)) {
-                    level_ = logging::LEVEL::INFO;
-                }; // FIXME-TABLE: Selection overlap
-                ImGui::TableNextColumn();
-                if (ImGui::Selectable("WARNING", level_ == logging::LEVEL::WARNING)) {
-                    level_ = logging::LEVEL::WARNING;
-                }; // FIXME-TABLE: Selection overlap
-                ImGui::TableNextColumn();
-                if (ImGui::Selectable("ERRORS", level_ == logging::LEVEL::ERRORS)) {
-                    level_ = logging::LEVEL::ERRORS;
-                }; // FIXME-TABLE: Selection overlap
-                ImGui::TableNextColumn();
-                if (ImGui::Selectable("CRITICAL", level_ == logging::LEVEL::CRITICAL)) {
-                    level_ = logging::LEVEL::CRITICAL;
-                }; // FIXME-TABLE: Selection overlap
-
-                ImGui::EndTable();
-            }
-            if (ImGui::Button("Submit")) { 
-                write_config_file(api_key, path_to_log, path_to_output, verbosity, level_);
-                this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
-                this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
-                this->batch_group->set_sender(this->request_sender);
-                this->_path_to_output = path_to_output;
+            if (this->conf_form<true>()) {
                 ImGui::CloseCurrentPopup();
-            }
+            };
             ImGui::EndPopup();
         }
         return !unused_open;

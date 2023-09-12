@@ -46,6 +46,7 @@ add_library(RestfulEzreal STATIC
     src/RestfulEzreal/Endpoints/LOR_endpoints.cpp
     src/RestfulEzreal/Endpoints/VAL_endpoints.cpp
     src/RestfulEzreal/RestfulEzreal.cpp
+    src/RestfulEzreal/utils/utils.cpp
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp 
     ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp 
     ${IMGUI_DIR}/imgui.cpp 

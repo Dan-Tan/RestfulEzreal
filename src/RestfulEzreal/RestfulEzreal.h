@@ -44,7 +44,7 @@ namespace restfulEz {
             RestfulEzreal(current_page* on_display);
 
             void OnUIRender();
-            void render_welcome();
+            int render_welcome();
             void render_welcome_config();
             QUERY_FORM* _next_request = nullptr;
 
@@ -73,6 +73,8 @@ namespace restfulEz {
             
             void configure_from_existing();
             bool configure_new_client(bool allow_close = false);
+            template<bool in_popup>
+            bool conf_form();
             void reconfigure_client();
             void config_check();
     };

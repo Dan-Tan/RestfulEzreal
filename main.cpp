@@ -427,7 +427,7 @@ int main(int, char**)
 
     // Create window with Vulkan context
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+Vulkan example", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "RESTfulEzreal", nullptr, nullptr);
     if (!glfwVulkanSupported())
     {
         printf("GLFW: Vulkan Not Supported\n");
@@ -497,10 +497,10 @@ int main(int, char**)
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != nullptr);
     io.Fonts->AddFontDefault();
-    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Light.ttf", 75.0f);
-    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Light.ttf", 20.0f);
-    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Light.ttf", 25.0f);
-    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-ExtraLight.ttf", 5.0f);
+    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Light.ttf",  75.0f);
+    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Light.ttf",  20.0f);
+    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Medium.ttf", 15.0f);
+    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Medium.ttf", 10.0f);
     io.Fonts->Build();
 
     // Upload Fonts
