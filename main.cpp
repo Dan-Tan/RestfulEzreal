@@ -570,7 +570,7 @@ int main(int, char**)
         ImGui::NewFrame();
 
         // navigBar->render();
-        _main->render_welcome();
+        _main->OnUIRender();
 
         // Rendering
         ImGui::Render();

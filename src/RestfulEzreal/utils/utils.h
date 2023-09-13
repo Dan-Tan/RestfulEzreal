@@ -75,4 +75,11 @@ namespace re_utils {
         text.frame_inc++;
         return false;
     }
+
+    inline void full_display() {
+        // set next window to take full display
+        static ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, io.DisplaySize.y));
+    }
 };

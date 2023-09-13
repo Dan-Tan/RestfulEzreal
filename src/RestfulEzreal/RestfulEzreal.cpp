@@ -89,6 +89,26 @@ namespace restfulEz {
 #if DEBUG_MODE
         ImGui::ShowMetricsWindow();
 #endif
+        static bool welcome = true;
+        static int ret = -1;
+        if (welcome) {
+            switch (ret) {
+                case -1:
+                    ret = this->render_welcome(); break;
+                case 1:
+                    break;
+                case 2:
+                    break;
+                case 3:
+                    this->render_welcome_config(); break;
+                case 4:
+                    break;
+                case 5:
+                    break;
+                default:
+                    std::cerr << "Invalid welcome page index" << std::endl;
+            }
+        } else {
 
         static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
         static ImGuiIO& io = ImGui::GetIO();
@@ -109,6 +129,7 @@ namespace restfulEz {
 
         // In a seperate window render the status of the client.
         this->render_client_status();
+        }
     }
 
     static bool render_button_text(bool* hovered, const char* txt, const char* ID) {
@@ -225,7 +246,11 @@ namespace restfulEz {
     }
 
     void RestfulEzreal::render_welcome_config() {
+        re_utils::full_display();
+        static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
+        ImGui::Begin("Welcome Config", NULL, window_flags);
         this->conf_form<false>();
+        ImGui::End();
     }
 
     static void render_recent_request(const std::string& req_name, const std::vector<std::string>& param_descriptions) {
@@ -359,6 +384,40 @@ namespace restfulEz {
         this->_next_form_id += 1;
     }
 
+    static int search_and_display(const std::string& path, const float& x_begin, const float& x_end) {
+        static ImGuiIO& io = ImGui::GetIO();
+        static bool first_pass = true;
+        static bool valid_path = false;
+        
+        static std::string file_content;
+
+        if (first_pass) { 
+            std::ifstream config_file;
+            config_file.open((path.c_str())); 
+            if (config_file.is_open()) {
+                config_file >> file_content;
+                valid_path = true;
+            }
+        }
+        
+        ImGui::SetCursorPosX(x_begin);
+        ImGui::PushFont(io.Fonts->Fonts[0]);
+        if (valid_path) {
+            ImGui::Text(file_content.data());
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
+            ImGui::Text("ERROR!");
+            ImGui::Text("INVALID FILE PATH!");
+            ImGui::PopStyleColor();
+        }
+        ImGui::PopFont();
+
+        bool use_file = false;
+        
+
+        return use_file;
+    }
+
     inline bool file_exists(const std::string& name) {
         if (FILE* file = fopen(name.c_str(), "r")) {
             fclose(file);
@@ -431,7 +490,7 @@ namespace restfulEz {
                 txt_width = ImGui::CalcTextSize("RESTfulEzreal;").x;
                 ImGui::PopFont();
             }
-            ImGui::SetNextItemWidth(io.DisplaySize.x * 0.2 - (x_align - io.DisplaySize.x * 0.5) + txt_width * 0.5);
+            ImGui::SetNextItemWidth(txt_width);
         }
         ImGui::InputText(ID, to_write, write_size, input_flag);
         ImGui::PopFont();
@@ -473,7 +532,7 @@ namespace restfulEz {
             }
             ImVec2 title_pos = ImVec2(io.DisplaySize.x * 0.3 - 0.5 * sze.x, io.DisplaySize.y * 0.25 - 0.5 * sze.y); 
             y_pos = title_pos.y + 2 * sze.y + 0.5 * lne_height;
-            x_ali = io.DisplaySize.x  - title_pos.x - sze.x;
+            x_ali = io.DisplaySize.x * 0.5 - 0.5 * sze.x;
             ImGui::SetCursorPosY(y_pos);
         } else {
             x_ali = 1.0f;
@@ -494,7 +553,7 @@ namespace restfulEz {
         if constexpr (!in_popup) {ImGui::SetCursorPosX(x_ali);}
         float context_width = 0.0f;
         if constexpr (!in_popup) { 
-            context_width = io.DisplaySize.x * 0.2 - (x_ali - io.DisplaySize.x * 0.5) + sze.x * 0.5;
+            context_width = sze.x;
         };
         if (ImGui::BeginTable("Logging Level", 5, ImGuiTableFlags_NoSavedSettings, ImVec2(context_width, 0.0f), context_width)) {
 
