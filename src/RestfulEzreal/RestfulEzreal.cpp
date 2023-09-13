@@ -1,9 +1,11 @@
 #include <iostream>
 #include <thread>
+#include <nfd.h> // file_dialog
 #include <regex>
 #include <tuple>
 #include <array>
 #include <json/json.h>
+#include <string_view>
 #include "RestfulEzreal.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -84,6 +86,29 @@ namespace restfulEz {
 
     };
 
+    static std::string config_file_dialog() {
+        NFD_Init();
+        
+        std::string to_ret;
+        nfdchar_t *outPath;
+        nfdresult_t result = NFD_OpenDialog(&outPath, NULL, 0, NULL);
+        if (result == NFD_OKAY) {
+            to_ret = std::string(outPath);
+            NFD_FreePathN(outPath);
+        }
+        else if (result == NFD_CANCEL)
+        {
+            to_ret = std::string("CANCEL");
+        }
+        else 
+        {
+            std::cerr << "ERROR WITH FILE DIALOG" << std::endl;
+        }
+        
+        NFD_Quit();
+        return to_ret;
+    }
+
     void RestfulEzreal::OnUIRender() {
         // Main render function for the user interface
 #if DEBUG_MODE
@@ -98,6 +123,7 @@ namespace restfulEz {
                 case 1:
                     break;
                 case 2:
+                    welcome = !this->start_up_from_existing();
                     break;
                 case 3:
                     this->render_welcome_config(); break;
@@ -214,7 +240,10 @@ namespace restfulEz {
         if (render_button_text(&hovered_button[0], " from existing", ">##1")) { start_up_type = 1; };
 
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[1], title_pos.y + 2*  sze.y + 3 * lne_height));
-        if (render_button_text(&hovered_button[1], " from custom  ", ">##3")) { start_up_type = 2; };
+        if (render_button_text(&hovered_button[1], " from custom  ", ">##3")) { 
+            start_up_type = 2; 
+            this->custom_config_path = config_file_dialog();
+        };
 
         ImGui::SetCursorPos(ImVec2(last_ali_col - txt_size[1], title_pos.y + 2*  sze.y + 4.5 * lne_height));
         if (render_button_text(&hovered_button[2], " new          ", ">##4")) { start_up_type = 3; };
@@ -407,6 +436,8 @@ namespace restfulEz {
         } else {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
             ImGui::Text("ERROR!");
+            
+            ImGui::SetCursorPosX(x_begin);
             ImGui::Text("INVALID FILE PATH!");
             ImGui::PopStyleColor();
         }
@@ -444,9 +475,14 @@ namespace restfulEz {
         config_file.close();
     }
 
-    void RestfulEzreal::configure_from_existing() {
+    void RestfulEzreal::configure_from_existing(bool custom_path, const std::string& file_path) {
             simdjson::ondemand::parser parser;
-            simdjson::padded_string contents = simdjson::padded_string::load(CONFIG_FILE_PATH);
+            simdjson::padded_string contents;
+            if (custom_path) {
+                contents = simdjson::padded_string::load(file_path);
+            } else {
+                contents = simdjson::padded_string::load(CONFIG_FILE_PATH);
+            }
             simdjson::ondemand::document doc = parser.iterate(contents);
 
             logging::LEVEL report_level = static_cast<logging::LEVEL>(doc["log-level"].get_int64().value());
@@ -630,5 +666,78 @@ namespace restfulEz {
 
         this->batch_group->render_form();
 
+    }
+
+    static std::unique_ptr<std::string> display_custom_file(const std::string& path, const float x_begin, const float x_end) {
+        /*
+         * Display the file the user gave. 
+         * ASSUMES VALID FILE PATH.
+         */
+        static       std::unique_ptr<std::string> contents = std::make_unique<std::string>("");
+
+        static ImGuiIO& io = ImGui::GetIO();
+
+        static bool first_pass = true;
+        if (first_pass) {
+            first_pass = false;
+            std::ifstream file(path);
+            std::ostringstream ss;
+            ss << file.rdbuf();
+            *contents = ss.str();
+            file.close();
+            contents->insert(contents->end(), simdjson::SIMDJSON_PADDING, '\0');
+        }
+
+        ImGui::SetCursorPosY(io.DisplaySize.y * 0.333);
+        
+        ImGui::PushFont(io.Fonts->Fonts[3]);
+        ImGui::SetCursorPosX(x_begin);
+        ImGui::TextUnformatted(contents->data());
+        ImGui::PopFont();
+
+        ImGui::SetCursorPosX(x_begin);
+        if (ImGui::Button("CANCEL")) {
+            *contents = "CANCEL";
+            return std::move(contents);
+        };
+
+        static const float button_size = ImGui::CalcTextSize("CONTINUE").x - 2 * ImGui::GetStyle().ButtonTextAlign.x;
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x_end - button_size);
+        if (ImGui::Button("CONTINUE")) {
+            first_pass = true;
+            return std::move(contents);
+        }
+
+        return nullptr;
+    }
+
+    bool RestfulEzreal::start_up_from_existing() {
+        static float    x_begin   = 0.0f;
+        static float    x_end     = 0.0f;
+        static bool     calc_once = true;
+        static ImGuiIO& io        = ImGui::GetIO();
+
+        if (calc_once) {
+            ImGui::PushFont(io.Fonts->Fonts[1]);
+            float x_sze = 0.5 * ImGui::CalcTextSize("RESTfulEzreal;").x;
+            ImGui::PopFont();
+
+            x_begin = io.DisplaySize.x * 0.5 - x_sze;
+            x_end   = io.DisplaySize.x * 0.5 + x_sze;
+        }
+
+        re_utils::full_display();
+        
+        ImGui::Begin("From existing validation", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
+
+        static std::unique_ptr<std::string> contents = nullptr;
+        contents = display_custom_file(this->custom_config_path, x_begin, x_end);
+
+        ImGui::End();
+
+        bool finished = false;
+
+        return finished;
     }
 }

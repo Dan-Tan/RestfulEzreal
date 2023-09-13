@@ -23,6 +23,7 @@ option(GLFW_BUILD_DOCS "Build the GLFW documentation" OFF)
 option(GLFW_INSTALL "Generate installation target" OFF)
 option(GLFW_DOCUMENT_INTERNALS "Include internals in documentation" OFF)
 add_subdirectory(${GLFW_DIR} binary_dir EXCLUDE_FROM_ALL)
+add_subdirectory(nativefiledialog-extended)
 include_directories(${GLFW_DIR}/include)
 
 # Dear ImGui
@@ -31,7 +32,7 @@ include_directories(${IMGUI_DIR} ${IMGUI_DIR}/backends ..)
 
 # Libraries
 find_package(Vulkan REQUIRED)
-set(LIBRARIES "glfw;Vulkan::Vulkan")
+set(LIBRARIES "glfw;Vulkan::Vulkan;nfd")
 
 # Use vulkan headers from glfw:
 include_directories(${GLFW_DIR}/deps)
@@ -73,6 +74,7 @@ add_subdirectory(riot-cpp/src/riot-cpp)
 target_include_directories(RestfulEzreal PUBLIC ./simdjson_temp/)
 target_include_directories(RestfulEzreal PUBLIC ${CURL_INCLUDE_DIRS})
 target_include_directories(RestfulEzreal PUBLIC ./riot-cpp/src/riot-cpp)
+target_include_directories(RestfulEzreal PUBLIC ./nativefiledialog-extended/src/include)
 
 target_link_libraries(RestfulEzreal PUBLIC riot-cpp)
 

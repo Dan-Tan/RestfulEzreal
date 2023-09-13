@@ -40,6 +40,8 @@ namespace restfulEz {
 
             int _next_form_id = 1;
 
+            std::string custom_config_path;
+
         public:
             RestfulEzreal(current_page* on_display);
 
@@ -71,11 +73,13 @@ namespace restfulEz {
             void render_json() {};
             void render_rate_status() {};
             
-            void configure_from_existing();
+            void configure_from_existing(bool custom_path = false, const std::string& file_path = std::string(""));
             bool configure_new_client(bool allow_close = false);
             template<bool in_popup>
             bool conf_form();
             void reconfigure_client();
             void config_check();
+
+            bool start_up_from_existing();
     };
 }
