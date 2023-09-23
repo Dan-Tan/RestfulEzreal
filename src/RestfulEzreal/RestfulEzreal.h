@@ -3,6 +3,7 @@
 #include "json/json.h"
 #include "RequestQueue.h"
 #include "QueryForm.h"
+#include "simdjson.h"
 #include <fstream>
 #include <vector>
 #include <array>
@@ -32,7 +33,7 @@ namespace restfulEz {
             std::string _path_to_output;
 
             std::vector<QUERY_FORM> _current_forms = {};
-            std::shared_ptr<RequestSender> request_sender;
+            std::shared_ptr<RequestSender> request_sender = std::make_shared<RequestSender>(); // default init create thread
             bool send_next_request = false;
             bool client_tested = false;
 
@@ -44,6 +45,9 @@ namespace restfulEz {
 
         public:
             RestfulEzreal(current_page* on_display);
+            ~RestfulEzreal() {
+                this->request_sender->stop();
+            }
 
             void OnUIRender();
             int render_welcome();
@@ -61,7 +65,6 @@ namespace restfulEz {
 
             void pushNewForm(QUERY_FORM new_form);
 
-            void set_output_directory() {};
             void set_debug_level() {};
             void set_verbosity() {};
 
@@ -81,5 +84,7 @@ namespace restfulEz {
             void config_check();
 
             bool start_up_from_existing();
+            void instantiate_client(int* int_out, int* parse_out, const std::string& file_path);
+            int display_configuration_process(std::unique_ptr<std::string> file_cont, const float x_align);
     };
 }

@@ -1,5 +1,7 @@
 #include "RequestQueue.h"
 #include "BatchRequests.h"
+#include "imgui.h"
+#include "utils/utils.h"
 #include <stdexcept>
 #include <filesystem>
 
@@ -14,15 +16,11 @@
 
 namespace restfulEz {
 
-    RequestSender::RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_dir)
-        : output_directory(output_dir) {
+    RequestSender::RequestSender() {
         this->worker_thread = std::thread([this] {this->worker();});
-        this->underlying_client = client;
-        std::filesystem::create_directories(this->output_directory);
     }
 
     RequestSender::~RequestSender() {
-
         {
             std::unique_lock<std::mutex> lock(this->queue_mutex);
             this->stop_execution = true;
@@ -36,37 +34,69 @@ namespace restfulEz {
         while (true) {
             request task;
             std::shared_ptr<BatchRequest> b_task;
+            std::function<void()> generic_work;
             bool iterative = false;
+            bool singular = false;
 
             {
                 std::unique_lock<std::mutex> lock(this->queue_mutex);
 
                 this->condition.wait(lock, [this]() {
-                        return this->stop_execution || !this->simple_requests.empty() || !this->linked_requests.empty();
-                        });
+                        return this->stop_execution || !this->simple_requests.empty() || !this->linked_requests.empty() || !this->work.empty();
+                });
 
-                if (this->stop_execution && ( this->simple_requests.empty() || this->linked_requests.empty())) {
+                if (this->stop_execution && ( this->simple_requests.empty() || this->linked_requests.empty() || this->work.empty())) {
                     return;
                 }
 
-                if (!this->simple_requests.empty()) {
+                if (!this->work.empty()) {
+                    generic_work = std::move(this->work.front());
+                    this->work.pop();
+                    iterative = false; singular = false;
+                } else if (!this->simple_requests.empty()) {
                     task = std::move(this->simple_requests.front());
                     this->simple_requests.pop();
-                    iterative = false;
+                    iterative = false; singular = true;
                 } else if (!this->linked_requests.empty()) {
                     b_task = std::move(this->linked_requests.front());
                     this->linked_requests.pop();
-                    iterative = true;
+                    iterative = true; singular = false;
                 } else {
                     throw std::logic_error("Request thread continued with no tasks");
                 }
             };
             if (iterative) {
                 this->Send_Batch_Request(b_task);
-            } else {
+            } else if (singular) {
                 this->Send_Request(task);
+            } else {
+                generic_work();
             }
         }
+    }
+
+    void RequestSender::add_request(request task) {
+        {
+            std::unique_lock<std::mutex> lock(queue_mutex);
+            this->simple_requests.push(task);
+        }
+        condition.notify_one();
+    }
+
+    void RequestSender::add_batch_request(std::shared_ptr<BatchRequest> batch_task) {
+        {
+            std::unique_lock<std::mutex>  lock(queue_mutex);
+            this->linked_requests.push(batch_task);
+        }
+        condition.notify_one();
+    }
+
+    void RequestSender::add_generic(std::function<void()> generic_work) {
+        {
+            std::unique_lock<std::mutex>  lock(queue_mutex);
+            this->work.push(generic_work);
+        }
+        condition.notify_one();
     }
 
     static const char* GAMES_[] = { "Riot", "League of Legends", "TeamfightTactics", "Legends of Runeterra", "Valorant"};
@@ -116,6 +146,22 @@ namespace restfulEz {
 
     using json_ptr = std::unique_ptr<std::vector<char>>;
 
+    static bool check_failure_response(const std::vector<char>& response) {
+        try {
+            bool failure = response[2] == 's'
+                        && response[3] == 't'
+                        && response[4] == 'a'
+                        && response[5] == 't'
+                        && response[6] == 'u'
+                        && response[7] == 's';
+            return failure;
+        }
+        catch (std::out_of_range& ex) {
+            return true; // request failed
+        }
+
+    }
+
     json_ptr RequestSender::Send_Request(request& task) {
 
         this->recent_request = std::string(GAMES_[task._game]) + " | " + std::string(GAME_ENDPOINTS_[task._game][task._endpoint]) + " | " + std::string(ENDPOINT_METHODS_[task._game][task._endpoint][task._endpoint_method]);
@@ -140,6 +186,10 @@ namespace restfulEz {
                 response = this->Send_LOR(task); break;
             default:
                 throw std::invalid_argument("Invalid Game Index");
+        }
+        bool failure = response->size() == 0 || check_failure_response(*response);
+        if (task.success_ptr) {
+            *task.success_ptr = failure ? 2 : 1;
         }
         this->write_response_file(task, *response);
         return std::move(response);
@@ -200,5 +250,49 @@ namespace restfulEz {
         }
 
         D("Batch Request finished executing");
+    }
+
+    void RequestSender::test_regions() {
+        /*
+         * Simply insert status requests for each region into request queue then returns
+         * LOL STATUS request has ID 1, 5, 0
+         */
+
+        static auto add_req = [this](const std::size_t ind) -> void 
+        {
+            this->add_request({1, 5, 0, {this->regions[ind]}, {}, {}, &this->region_avail[ind]});
+        };
+
+        re_utils::map_func(add_req, std::make_index_sequence<16>({}));
+    }
+
+    void RequestSender::region_test_display() {
+
+        
+        static ImGuiIO& io = ImGui::GetIO();
+
+        static bool first = true;
+        static float title_size;
+        if (first) {
+            ImGui::PushFont(io.Fonts->Fonts[1]);
+            title_size = ImGui::CalcTextSize("RESTfulEzreal;").x;
+            ImGui::PopFont();
+            first = false;
+        }
+
+        const float x_begin = io.DisplaySize.x * 0.5 - title_size * 0.5;
+        const float x_end   = x_begin + title_size;
+
+        static auto disp_singular_text = [x_begin, x_end, this](const std::size_t ind) -> void 
+        {
+            ImGui::SetCursorPosX(x_begin);
+            ImGui::TextUnformatted("Testing ");
+            ImGui::SameLine();
+            ImGui::TextUnformatted(this->regions[ind]);
+            ImGui::SameLine();
+            re_utils::pending_text_right("waiting", "Success", "failure", this->region_avail[ind], x_end);
+        };
+
+        re_utils::map_func(disp_singular_text, std::make_index_sequence<16>({}));
     }
 }

@@ -335,13 +335,14 @@ namespace restfulEz {
         this->current_position = this->current_position->next;
     }
 
-    request::request(const int game, const int endpoint, const int endpoint_method, const std::vector<PARAM_CONT>& pars, const std::vector<P_NAME>& opt_names, const std::vector<PARAM_CONT>& opt_inputs) {
+    request::request(const int game, const int endpoint, const int endpoint_method, const std::vector<PARAM_CONT>& pars, const std::vector<P_NAME>& opt_names, const std::vector<PARAM_CONT>& opt_inputs, int* succ_ptr) {
         this->_game = game;
         this->_endpoint = endpoint;
         this->_endpoint_method = endpoint_method;
         this->params = pars;
         this->optional_names = opt_names;
         this->optional_inputs = opt_inputs;
+        this->success_ptr = succ_ptr;
     }
 
     request LinkedRequest::get_base_copy() {

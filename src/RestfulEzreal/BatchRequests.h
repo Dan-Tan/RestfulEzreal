@@ -65,20 +65,22 @@ namespace restfulEz {
         int _endpoint_method;
 
         std::vector<PARAM_CONT> params;
-        std::vector<P_NAME> optional_names;
+        std::vector<P_NAME>     optional_names;
         std::vector<PARAM_CONT> optional_inputs;
+        
+        int* success_ptr = nullptr;
 
         bool same_endpoint(const request& other) {
             bool same = true;
-            same &= this->_game == other._game;
-            same &= this->_endpoint == other._endpoint;
+            same &= this->_game            == other._game;
+            same &= this->_endpoint        == other._endpoint;
             same &= this->_endpoint_method == other._endpoint_method;
             return same;
         }
         
         request() {};
         request(const int game, const int endpoint, const int endpoint_method);
-        request(const int game, const int endpoint, const int endpoint_method, const std::vector<PARAM_CONT>& pars, const std::vector<P_NAME>& opt_names, const std::vector<PARAM_CONT>& opt_inputs);
+        request(const int game, const int endpoint, const int endpoint_method, const std::vector<PARAM_CONT>& pars, const std::vector<P_NAME>& opt_names, const std::vector<PARAM_CONT>& opt_inputs, int* succ_ptr = nullptr);
     } request;
 
     struct LinkedRequest;

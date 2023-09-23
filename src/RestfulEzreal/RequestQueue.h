@@ -3,6 +3,7 @@
 #include <thread>
 #include <mutex>
 #include <queue>
+#include <filesystem>
 #include <condition_variable>
 #include "BatchRequests.h"
 #include "client/client.h"
@@ -25,7 +26,7 @@ namespace restfulEz {
             bool stop_execution = false;
 
             // output information
-            const std::string output_directory;
+            std::string output_directory;
 
             // Underlying client used to send requests
             std::shared_ptr<client::RiotApiClient> underlying_client = nullptr;
@@ -35,31 +36,38 @@ namespace restfulEz {
 
             // Requests with a chain of dependecies
             std::queue<std::shared_ptr<BatchRequest>> linked_requests; 
+            
+            // generic work
+            std::queue<std::function<void()>> work;
+
+            // test display lock vars
+            bool test_in_progress                      = false;
+            std::array<int,    16> region_avail = { 0 };
+            static constexpr std::array<char[5], 16> regions      = {"BR1" ,"EUN1" ,"EUW1" ,"JP1" ,"KR" ,"LA1" ,"LA2" ,"NA1" ,"OC1" ,"TR1" ,"RU" ,"PH2" ,"SG2" ,"TH2" ,"TW2" ,"VN2"};
 
         public:
-            RequestSender(std::shared_ptr<client::RiotApiClient> client, std::string& output_directory);
+            RequestSender();
             ~RequestSender();
 
-            void set_client(std::shared_ptr<client::RiotApiClient> client) {this->underlying_client = client;};
+            void stop() {this->stop_execution = true;}
 
-            void add_request(request task) {
-                {
-                    std::unique_lock<std::mutex> lock(queue_mutex);
-                    this->simple_requests.push(task);
-                }
-                condition.notify_one();
-            };
+            void set_client(std::shared_ptr<client::RiotApiClient> client) {this->underlying_client = client;};
+            void set_output_directory(const std::string& output) { this->output_directory = output; std::filesystem::create_directories(this->output_directory);}
+
+            void add_request(request task);
+            void add_batch_request(std::shared_ptr<BatchRequest> batch_task);
+            void add_generic(std::function<void()> generic_work);
+
+            int get_generic_size() {return this->work.size();};
+            int get_simple_size() {return this->simple_requests.size();};
+            int get_batch_size() {return this->linked_requests.size();};
+            
+            // for start up display
+            void region_test_display();
+            void test_regions();
 
             std::string recent_request = "No Requests Sent.";
             std::vector<std::string> recent_params = {};
-
-            void add_batch_request(std::shared_ptr<BatchRequest> batch_task) {
-                {
-                    std::unique_lock<std::mutex>  lock(queue_mutex);
-                    this->linked_requests.push(batch_task);
-                }
-                condition.notify_one();
-            };
 
         private: // methods
             void worker();

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstring>
 #include <thread>
 #include <nfd.h> // file_dialog
 #include <regex>
@@ -6,6 +7,7 @@
 #include <array>
 #include <json/json.h>
 #include <string_view>
+#include <tuple>
 #include "RestfulEzreal.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -492,7 +494,8 @@ namespace restfulEz {
             log_path = doc["log-path"].get_string().value();
 
             this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, log_path, report_level, doc["verbosity"].get_bool().value());
-            this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
+            this->request_sender->set_client(this->_underlying_client);
+            this->request_sender->set_output_directory(this->_path_to_output);
             this->batch_group->set_sender(this->request_sender);
     }
     
@@ -627,7 +630,8 @@ namespace restfulEz {
         if (ImGui::Button("Submit")) { 
             write_config_file(api_key, path_to_log, path_to_output, verbosity, level_);
             this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
-            this->request_sender = std::make_shared<RequestSender>(this->_underlying_client, this->_path_to_output);
+            this->request_sender->set_client(this->_underlying_client);
+            this->request_sender->set_output_directory(this->_path_to_output);
             this->batch_group->set_sender(this->request_sender);
             this->_path_to_output = path_to_output;
             submit = true;
@@ -673,11 +677,13 @@ namespace restfulEz {
          * Display the file the user gave. 
          * ASSUMES VALID FILE PATH.
          */
-        static       std::unique_ptr<std::string> contents = std::make_unique<std::string>("");
+        static std::unique_ptr<std::string> contents = std::make_unique<std::string>("");
 
         static ImGuiIO& io = ImGui::GetIO();
 
         static bool first_pass = true;
+        static re_utils::FBF_STRING_256 disp;
+
         if (first_pass) {
             first_pass = false;
             std::ifstream file(path);
@@ -686,30 +692,132 @@ namespace restfulEz {
             *contents = ss.str();
             file.close();
             contents->insert(contents->end(), simdjson::SIMDJSON_PADDING, '\0');
+            disp = re_utils::create_fbf_string<256, re_utils::FBF_STRING_256>(*contents, 1);
         }
+
 
         ImGui::SetCursorPosY(io.DisplaySize.y * 0.333);
         
         ImGui::PushFont(io.Fonts->Fonts[3]);
         ImGui::SetCursorPosX(x_begin);
-        ImGui::TextUnformatted(contents->data());
+        if (re_utils::fbf_text(disp)) {
+            ImGui::PopFont();
+            return std::move(contents);    
+        };
         ImGui::PopFont();
 
-        ImGui::SetCursorPosX(x_begin);
-        if (ImGui::Button("CANCEL")) {
-            *contents = "CANCEL";
-            return std::move(contents);
-        };
+        return nullptr;
+    }
 
-        static const float button_size = ImGui::CalcTextSize("CONTINUE").x - 2 * ImGui::GetStyle().ButtonTextAlign.x;
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(x_end - button_size);
-        if (ImGui::Button("CONTINUE")) {
-            first_pass = true;
-            return std::move(contents);
+    static bool display_in_valid_json(simdjson::ondemand::parser& parser, simdjson::ondemand::document& doc, const std::string& file_contents, bool retry = false) {
+        /* 
+         * Display valid message in green upon success
+         * red upon failure to pass
+         */
+        static bool parsed = false;
+        static bool success;
+        if (retry) {
+            parsed = false; // force retry
+        }
+        if (!parsed) {
+            try {
+                doc = parser.iterate(file_contents.data(), strlen(file_contents.data()), sizeof(file_contents.data()));
+                success = true;
+            }
+            catch (simdjson::simdjson_error& ex) {
+                success = false;
+            }
+        }
+        if (success) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+            ImGui::TextUnformatted("Valid Json Format");
+            ImGui::PopStyleColor();
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
+            ImGui::TextUnformatted("Invalid Json");
+            ImGui::PopStyleColor();
+        }
+        return success;
+    }
+
+    using Parser = simdjson::ondemand::parser;
+    using Document = simdjson::ondemand::document;
+
+    void RestfulEzreal::instantiate_client(int* int_out, int* parse_out, const std::string& file_path) {
+
+        Parser parser;
+        Document doc;
+        std::string contents;
+        try {
+            std::ifstream config(file_path);
+            if (!config.is_open()) {
+                throw std::runtime_error("Invalid file path given, exiting config...");
+            }
+            std::stringstream intermediate; intermediate << config.rdbuf();
+            config.close();
+            contents = intermediate.str();
+            contents.insert(contents.end(), simdjson::SIMDJSON_PADDING, '\0');
+            doc = parser.iterate(contents.data(), strlen(contents.data()), sizeof(contents.data()));
+            *parse_out = 1; // success
+        }
+        catch (simdjson::simdjson_error& ex) {
+            std::cerr << "Invalid Json Format, exiting config..." << std::endl;
+            *parse_out = 2;
+            *int_out = 2;
+            return;
+        }
+        catch (std::runtime_error& ex) {
+            std::cerr << ex.what() << std::endl;
+            *parse_out = 2;
+            *int_out = 2;
+            return;
+        }
+        // can probably template
+        std::string log_path;
+        try {
+            log_path = doc["log-path"].get_string().value();
+        }
+        catch (simdjson::simdjson_error& ex) {
+            std::cerr << "Log path not given, defaulting to logs.log in binary directory" << std::endl;
+            log_path = "logs.log";
         }
 
-        return nullptr;
+        logging::LEVEL loglevel;
+        try {
+            loglevel = static_cast<logging::LEVEL>(doc["log-level"].get_int64().value());
+        }
+        catch (simdjson::simdjson_error& ex) {
+            std::cerr << "Log Level not given, defaulting to INFO" << std::endl;
+            loglevel = logging::LEVEL::INFO;
+        }
+        bool verbosity;
+        try {
+            verbosity = doc["verbosity"].get_bool().value();
+        }
+        catch (simdjson::simdjson_error& ex) {
+            std::cerr << "Log verbosity not given, defaulting to false" << std::endl;
+            verbosity = false;
+        }
+        
+        try {
+            this->_path_to_output = doc["output-path"].get_string().value();
+        }
+        catch (simdjson::simdjson_error& ex) {
+            std::cerr << "Output path not given, defaulting to \".\\output\\\" in binary dir" << std::endl;
+            this->_path_to_output = "./output/";
+        }
+
+        try {
+            doc["api-key"];
+            *int_out = 1;
+        } 
+        catch (simdjson::simdjson_error& ex) {
+            *int_out = 2;
+        }
+
+        this->_underlying_client = std::make_shared<client::RiotApiClient>(file_path, log_path, loglevel, verbosity);
+        this->request_sender->set_client(this->_underlying_client);
+        this->request_sender->set_output_directory(this->_path_to_output);
     }
 
     bool RestfulEzreal::start_up_from_existing() {
@@ -718,6 +826,11 @@ namespace restfulEz {
         static bool     calc_once = true;
         static ImGuiIO& io        = ImGui::GetIO();
 
+        static Parser parser;
+        static Document doc;
+        static int successful_parse = 0; // 0 - not finished, 1 - success, 2 - failure
+        static int instantiate_success = 0;
+
         if (calc_once) {
             ImGui::PushFont(io.Fonts->Fonts[1]);
             float x_sze = 0.5 * ImGui::CalcTextSize("RESTfulEzreal;").x;
@@ -725,14 +838,29 @@ namespace restfulEz {
 
             x_begin = io.DisplaySize.x * 0.5 - x_sze;
             x_end   = io.DisplaySize.x * 0.5 + x_sze;
+
+            this->request_sender->add_generic(std::bind(&RestfulEzreal::instantiate_client, this, &instantiate_success, &successful_parse, this->custom_config_path));
+            this->request_sender->test_regions();
+            calc_once = false;
         }
 
         re_utils::full_display();
         
         ImGui::Begin("From existing validation", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
-
-        static std::unique_ptr<std::string> contents = nullptr;
-        contents = display_custom_file(this->custom_config_path, x_begin, x_end);
+        
+        ImGui::SetCursorPos(ImVec2(x_begin, io.DisplaySize.y*0.25));
+        
+        ImGui::TextUnformatted("Validating File Format...");
+        ImGui::SameLine();
+        re_utils::pending_text_right("Pending", "Valid Json", "Invalid File Format", successful_parse, x_end);
+        ImGui::SetCursorPosX(x_begin);
+        ImGui::TextUnformatted("Instantiating Client...");
+        ImGui::SameLine();
+        re_utils::pending_text_right("Pending", "Successful", "Failure", instantiate_success, x_end);
+        ImGui::NewLine();
+        ImGui::NewLine();
+        this->request_sender->region_test_display();
+        ImGui::Text(std::to_string(this->request_sender->get_simple_size()).data());
 
         ImGui::End();
 
