@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <filesystem>
 
+#define NUM_REGIONS 16
+
 #ifdef DEBUG_MODE
 #include <iostream>
 #define D(x) std::cerr << x <<'\n'
@@ -266,8 +268,56 @@ namespace restfulEz {
         re_utils::map_func(add_req, std::make_index_sequence<16>({}));
     }
 
-    void RequestSender::region_test_display() {
+    static int acceptable_server_avail(const std::array<int, 16>& availabilities) {
 
+        int waiting_count = 0;
+        int success_count = 0;
+        int failure_count = 0;
+
+        for (const int& status : availabilities) {
+            if      (status == 0) { waiting_count++; }
+            else if (status == 1) { success_count++; }
+            else                  { failure_count++; }
+        }
+        // bit branchless programming for your enjoyment (preceded by branchful programming :) )
+        return 0 + ((success_count > NUM_REGIONS/2) * 1) + ((failure_count > NUM_REGIONS/2) * 2);
+    }
+
+    static bool make_recomendation(const int rec, const float x_begin, const float x_end) {
+
+        static ImGuiIO& io = ImGui::GetIO();
+
+        static constexpr char waiting_msg[] = "Testing in progress";
+        static constexpr char success_msg[] = "Key successfully validated";
+        static constexpr char failure_msg[] = "Key validation failed";
+
+        static constexpr char waiting_button[] = "Skip";
+        static constexpr char success_button[] = "Continue";
+        static constexpr char failure_button[] = "Continue (caution)";
+
+        static const float waiting_width = ImGui::CalcTextSize(waiting_msg).x;
+        static const float success_width = ImGui::CalcTextSize(success_msg).x;
+        static const float failure_width = ImGui::CalcTextSize(failure_msg).x;
+        
+        const char* to_use = (char*)((long)&waiting_msg[0] * (rec == 0) + (long)&success_msg[0] * (rec == 1) + (long)&failure_msg[0] * (rec == 2));
+        const char* button_msg = (char*)((long)&waiting_button[0] * (rec == 0) + (long)&success_button[0] * (rec == 1) + (long)&failure_button[0] * (rec == 2));
+
+        ImGui::SetCursorPosX(io.DisplaySize.x * 0.5  - ImGui::CalcTextSize(to_use).x * 0.5);
+        const ImVec4 col = (rec == 0) ? ImVec4(0.58f, 0.58f, 0.58f, 1.0f) : (rec == 1) ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_Text, col);
+        ImGui::TextUnformatted(to_use);
+        ImGui::PopStyleColor();
+
+        ImGui::NewLine();
+        ImGui::SetCursorPosX(x_end - ImGui::CalcTextSize(button_msg).x - 2* ImGui::GetStyle().ButtonTextAlign.x);
+        if (ImGui::Button(button_msg)) {
+            return true;
+        };
+        
+        return false;
+    }
+
+    int RequestSender::region_test_display() {
         
         static ImGuiIO& io = ImGui::GetIO();
 
@@ -283,7 +333,7 @@ namespace restfulEz {
         const float x_begin = io.DisplaySize.x * 0.5 - title_size * 0.5;
         const float x_end   = x_begin + title_size;
 
-        static auto disp_singular_text = [x_begin, x_end, this](const std::size_t ind) -> void 
+        static auto disp_singular_text = [this](const std::size_t ind, const float x_begin, const float x_end) -> void 
         {
             ImGui::SetCursorPosX(x_begin);
             ImGui::TextUnformatted("Testing ");
@@ -293,6 +343,23 @@ namespace restfulEz {
             re_utils::pending_text_right("waiting", "Success", "failure", this->region_avail[ind], x_end);
         };
 
-        re_utils::map_func(disp_singular_text, std::make_index_sequence<16>({}));
+        re_utils::map_func_mult(disp_singular_text, std::make_index_sequence<16>({}), x_begin, x_end);
+
+        char continue_button[9] = "continue";
+        const int recommendation = acceptable_server_avail(this->region_avail);
+        ImGui::NewLine();
+
+        int continue_indicator = 0;
+        // only return at very end to prevent flicker
+        if (make_recomendation(recommendation, x_begin, x_end)) {
+            continue_indicator = 1;
+        };
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x_begin);
+        if (ImGui::Button("Cancel")) {
+            continue_indicator = 2;
+        };
+
+        return continue_indicator;
     }
 }

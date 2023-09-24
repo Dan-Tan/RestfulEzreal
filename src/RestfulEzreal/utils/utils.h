@@ -159,4 +159,9 @@ namespace re_utils {
         (f(inds), ...);
     }
 
+    template <typename func, std::size_t ... inds, typename ... Params>
+    inline void map_func_mult(func f, std::index_sequence<inds...>, Params ... params) {
+        (f(inds, params...), ...);
+    }
+
 };

@@ -63,7 +63,7 @@ namespace restfulEz {
             int get_batch_size() {return this->linked_requests.size();};
             
             // for start up display
-            void region_test_display();
+            int region_test_display();
             void test_regions();
 
             std::string recent_request = "No Requests Sent.";

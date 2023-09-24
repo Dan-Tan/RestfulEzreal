@@ -821,8 +821,7 @@ namespace restfulEz {
     }
 
     bool RestfulEzreal::start_up_from_existing() {
-        static float    x_begin   = 0.0f;
-        static float    x_end     = 0.0f;
+        static float    x_sze     = 0.0f;
         static bool     calc_once = true;
         static ImGuiIO& io        = ImGui::GetIO();
 
@@ -833,16 +832,16 @@ namespace restfulEz {
 
         if (calc_once) {
             ImGui::PushFont(io.Fonts->Fonts[1]);
-            float x_sze = 0.5 * ImGui::CalcTextSize("RESTfulEzreal;").x;
+            x_sze = 0.5 * ImGui::CalcTextSize("RESTfulEzreal;").x;
             ImGui::PopFont();
-
-            x_begin = io.DisplaySize.x * 0.5 - x_sze;
-            x_end   = io.DisplaySize.x * 0.5 + x_sze;
 
             this->request_sender->add_generic(std::bind(&RestfulEzreal::instantiate_client, this, &instantiate_success, &successful_parse, this->custom_config_path));
             this->request_sender->test_regions();
             calc_once = false;
         }
+        const float x_begin = io.DisplaySize.x * 0.5 - x_sze;
+        const float x_end   = io.DisplaySize.x * 0.5 + x_sze;
+
 
         re_utils::full_display();
         
@@ -859,9 +858,7 @@ namespace restfulEz {
         re_utils::pending_text_right("Pending", "Successful", "Failure", instantiate_success, x_end);
         ImGui::NewLine();
         ImGui::NewLine();
-        this->request_sender->region_test_display();
-        ImGui::Text(std::to_string(this->request_sender->get_simple_size()).data());
-
+        int result = this->request_sender->region_test_display();
         ImGui::End();
 
         bool finished = false;
