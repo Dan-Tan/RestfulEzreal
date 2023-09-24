@@ -164,4 +164,12 @@ namespace re_utils {
         (f(inds, params...), ...);
     }
 
+    inline float text_size(const int font_ind, const char* title) {
+        float sze;
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[font_ind]);
+        sze = ImGui::CalcTextSize(title).x;
+        ImGui::PopFont();
+        return sze;
+    }
+
 };

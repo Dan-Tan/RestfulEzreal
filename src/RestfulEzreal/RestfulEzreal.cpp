@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <bits/stdc++.h>
 #include <thread>
 #include <nfd.h> // file_dialog
 #include <regex>
@@ -123,9 +124,9 @@ namespace restfulEz {
                 case -1:
                     ret = this->render_welcome(); break;
                 case 1:
-                    break;
+                    welcome = this->start_up_default(&ret); break;
                 case 2:
-                    welcome = !this->start_up_from_existing();
+                    welcome = !this->start_up_from_existing(&ret);
                     break;
                 case 3:
                     this->render_welcome_config(); break;
@@ -219,7 +220,7 @@ namespace restfulEz {
         ImGui::PopStyleColor();
         ImGui::PopFont();
         
-        static int start_up_type = -1;
+        int start_up_type = -1;
         
         ImGui::PushFont(io.Fonts->Fonts[0]);
         static bool hovered_button[5] = { false , false , false , false , false};
@@ -292,58 +293,7 @@ namespace restfulEz {
         }
     }
 
-    bool RestfulEzreal::validate_key() {
-        // check if the api-key given is valid.
-        bool valid_key = false;
-        bool tested = false;
-
-        static const std::regex reg_stat("status");
-        static std::smatch not_used;
-
-        if (!valid_key && !tested) {
-            json_ptr response = this->_underlying_client->Lol_Status.v4("OC1");
-            std::string raw_rp = response->data();
-            if (response->empty()) {
-                tested = true;
-                valid_key = false;
-            }
-            else if (!std::regex_search(raw_rp, not_used, reg_stat)) {
-                valid_key = true;
-                tested = true;
-            }
-            else {
-                static const std::regex code("(401|403)");
-                static const std::regex stat_code("status_code");
-                if (std::regex_search(raw_rp, not_used, code) || std::regex_search(raw_rp, not_used, stat_code)) {
-                    tested = true;
-                    valid_key = false;
-                }
-            }
-        }
-        if (!valid_key && !tested) {
-            json_ptr response = this->_underlying_client->Lol_Status.v4("KR");
-            std::string raw_rp = response->data();
-            static const std::regex stat("status");
-            if (!response->empty() || !std::regex_search(raw_rp, not_used, stat)) {
-                valid_key = true;
-            }
-            else {
-                static const std::regex code("(401|403)");
-                static const std::regex stat_code("status_code");
-                if (std::regex_search(raw_rp, not_used, code) || std::regex_search(raw_rp, not_used, stat_code)) {
-                    tested = true;
-                    valid_key = false;
-                }
-            }
-            tested = true;
-        }
-
-        return valid_key;
-    }
-
     void RestfulEzreal::render_client_status() {
-
-        static bool valid_key = false;
 
         static bool open = true;
         static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration;
@@ -362,19 +312,6 @@ namespace restfulEz {
             if (this->configure_new_client(true)) {
                 reconfiguring = false;
             }// allow the user to close the modal incase of not wanting to reconfigure
-        }
-
-        if (!this->client_tested) {
-            valid_key = this->validate_key();
-            this->client_tested = true;
-        }
-
-
-        if (valid_key) {
-            ImGui::Text("Client Initialised with valid key");
-        }
-        else {
-            ImGui::Text("API-KEY given was not valid or unable to be validated, please check your connection or RIOT developer website");
         }
 
         render_recent_request(this->request_sender->recent_request, this->request_sender->recent_params);
@@ -820,7 +757,7 @@ namespace restfulEz {
         this->request_sender->set_output_directory(this->_path_to_output);
     }
 
-    bool RestfulEzreal::start_up_from_existing() {
+    bool RestfulEzreal::start_up_from_existing(int* ret) {
         static float    x_sze     = 0.0f;
         static bool     calc_once = true;
         static ImGuiIO& io        = ImGui::GetIO();
@@ -831,6 +768,7 @@ namespace restfulEz {
         static int instantiate_success = 0;
 
         if (calc_once) {
+            //avoid push/pop font on every frame
             ImGui::PushFont(io.Fonts->Fonts[1]);
             x_sze = 0.5 * ImGui::CalcTextSize("RESTfulEzreal;").x;
             ImGui::PopFont();
@@ -842,27 +780,126 @@ namespace restfulEz {
         const float x_begin = io.DisplaySize.x * 0.5 - x_sze;
         const float x_end   = io.DisplaySize.x * 0.5 + x_sze;
 
+        bool finished = false;
 
         re_utils::full_display();
-        
+        // ------------ BEGIN WINDOW RENDER ---------------
         ImGui::Begin("From existing validation", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
         
         ImGui::SetCursorPos(ImVec2(x_begin, io.DisplaySize.y*0.25));
-        
         ImGui::TextUnformatted("Validating File Format...");
+
         ImGui::SameLine();
         re_utils::pending_text_right("Pending", "Valid Json", "Invalid File Format", successful_parse, x_end);
+
         ImGui::SetCursorPosX(x_begin);
         ImGui::TextUnformatted("Instantiating Client...");
+
         ImGui::SameLine();
         re_utils::pending_text_right("Pending", "Successful", "Failure", instantiate_success, x_end);
-        ImGui::NewLine();
+
         ImGui::NewLine();
         int result = this->request_sender->region_test_display();
-        ImGui::End();
 
-        bool finished = false;
+        ImGui::End();
+        // ------------ END WINDOW RENDER ----------------
+
+        if (result == 2) {
+            *ret = -1; // go back to home page
+            calc_once = true; // reset calc_once to allowed for calling again
+        } else if (result == 1) {
+            calc_once = true;
+            finished = true;
+        }
 
         return finished;
+    }
+
+    static void re_write_config(const char* new_key) {
+
+        std::ifstream default_config(CONFIG_FILE_PATH);
+        std::ofstream    temp_config("./tempEzrealRunes.json");
+
+        if (!default_config.is_open()) {
+            throw std::runtime_error("No Configuration File");
+        }
+
+        temp_config << "{\n\t\"api-key\" : \"" << new_key << "\"\n,";
+
+        std::string lne;
+        int counter = 0;
+        while (getline(default_config, lne)) {
+            if (counter > 1) {
+                temp_config << lne << "\n";
+            }
+            counter++;
+        }
+        default_config.close();
+        temp_config.close();
+
+        remove(CONFIG_FILE_PATH);
+        rename("./tempEzrealRunes.json", CONFIG_FILE_PATH);
+    }
+
+    bool RestfulEzreal::start_up_default(int* ret) {
+
+        static const float title_size = re_utils::text_size(1, "RESTfulEzreal;");
+        static ImGuiIO& io = ImGui::GetIO();
+
+        re_utils::full_display();
+
+        ImGui::Begin("From existing", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
+
+        ImGui::SetCursorPosY(io.DisplaySize.y * 0.5);
+        ImGui::SetCursorPosX(io.DisplaySize.x * 0.5 - title_size * 0.5);
+        if (ImGui::Button("back")) {
+            *ret = -1;
+        }
+        ImGui::SameLine();
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
+        static float lne_height = ImGui::GetTextLineHeightWithSpacing();
+        ImGui::SetCursorPosX(io.DisplaySize.x * 0.5 - title_size * 0.25 - ImGui::CalcTextSize("New API Key ").x);
+        ImGui::TextUnformatted("New API Key ");
+        ImGui::PopStyleColor();
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::SameLine();
+        ImGui::TextUnformatted(": ");
+        ImGui::PopStyleColor();
+        
+        static char api_key[256];
+        ImGui::SameLine();
+        ImGui::PushFont(io.Fonts->Fonts[3]);
+        static float lne_height2 = ImGui::GetTextLineHeightWithSpacing();
+        ImGui::SetCursorPosY(io.DisplaySize.y * 0.5 - (lne_height2 - lne_height) * 0.5);
+        ImGui::SetNextItemWidth(title_size * 0.75);
+        ImGui::InputText("##NEW API KEY", api_key, 256, ImGuiInputTextFlags_None);
+        ImGui::SameLine();
+        const float end_ofline = ImGui::GetCursorPosX();
+        ImGui::PopFont();
+        
+        ImGui::NewLine();
+        ImGui::NewLine();
+        ImGui::SameLine();
+        if (api_key[0] == '\0') {
+            ImGui::SetCursorPosX(end_ofline - ImGui::CalcTextSize("skip").x - 4 * ImGui::GetStyle().FramePadding.x);
+            if (ImGui::Button("skip")) {
+                this->custom_config_path = CONFIG_FILE_PATH; 
+                *ret = 2;
+            }
+        } else {
+            ImGui::SetCursorPosX(end_ofline - ImGui::CalcTextSize("add key").x);
+            if (ImGui::Button("add key")) {
+                re_write_config(api_key);
+                this->custom_config_path = CONFIG_FILE_PATH;
+                *ret = 2;
+            }
+        }
+
+
+        ImGui::End();
+
+        return true;
     }
 }

@@ -57,7 +57,6 @@ namespace restfulEz {
         private:
 
             void NewFormButton();
-            bool validate_key();
 
             int _current_id = 1;
 
@@ -83,8 +82,9 @@ namespace restfulEz {
             void reconfigure_client();
             void config_check();
 
-            bool start_up_from_existing();
+            bool start_up_from_existing(int* ret);
             void instantiate_client(int* int_out, int* parse_out, const std::string& file_path);
             int display_configuration_process(std::unique_ptr<std::string> file_cont, const float x_align);
+            bool start_up_default(int* ret);
     };
 }
