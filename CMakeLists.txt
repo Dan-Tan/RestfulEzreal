@@ -37,17 +37,40 @@ set(LIBRARIES "glfw;Vulkan::Vulkan;nfd")
 # Use vulkan headers from glfw:
 include_directories(${GLFW_DIR}/deps)
 
+if (temp)
+    # build ui components more frequently
+    add_library(RestfulEzrealGuiComps STATIC src/RestfulEzreal/utils/utils.cpp)
+    add_library(ImGui                 STATIC ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp 
+                                             ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp 
+                                             ${IMGUI_DIR}/imgui.cpp 
+                                             ${IMGUI_DIR}/imgui_draw.cpp 
+                                             ${IMGUI_DIR}/imgui_demo.cpp 
+                                             ${IMGUI_DIR}/imgui_tables.cpp 
+                                             ${IMGUI_DIR}/imgui_widgets.cpp)
+
+    add_executable(tempExec tempmain.cpp)
+    target_include_directories(tempExec PRIVATE ./imgui)
+    target_include_directories(tempExec PRIVATE ./glfw)
+    target_include_directories(tempExec PRIVATE src/RestfulEzreal/utils)
+    target_link_libraries(tempExec PRIVATE RestfulEzrealGuiComps)
+    target_link_libraries(tempExec PRIVATE ImGui)
+    target_link_libraries(tempExec PRIVATE ${LIBRARIES})
+    return()
+endif()
+
+set(SOURCE_DIR src/RestfulEzreal)
+
 add_library(RestfulEzreal STATIC 
-    src/RestfulEzreal/QueryForm.cpp
-    src/RestfulEzreal/RequestQueue.cpp
-    src/RestfulEzreal/BatchRequests.cpp
-    src/RestfulEzreal/Endpoints/endpoints.cpp 
-    src/RestfulEzreal/Endpoints/LOL_endpoints.cpp
-    src/RestfulEzreal/Endpoints/TFT_endpoints.cpp
-    src/RestfulEzreal/Endpoints/LOR_endpoints.cpp
-    src/RestfulEzreal/Endpoints/VAL_endpoints.cpp
-    src/RestfulEzreal/RestfulEzreal.cpp
-    src/RestfulEzreal/utils/utils.cpp
+    ${SOURCE_DIR}/QueryForm.cpp
+    ${SOURCE_DIR}/RequestQueue.cpp
+    ${SOURCE_DIR}/BatchRequests.cpp
+    ${SOURCE_DIR}/Endpoints/endpoints.cpp 
+    ${SOURCE_DIR}/Endpoints/LOL_endpoints.cpp
+    ${SOURCE_DIR}/Endpoints/TFT_endpoints.cpp
+    ${SOURCE_DIR}/Endpoints/LOR_endpoints.cpp
+    ${SOURCE_DIR}/Endpoints/VAL_endpoints.cpp
+    ${SOURCE_DIR}/RestfulEzreal.cpp
+    ${SOURCE_DIR}/utils/utils.cpp
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp 
     ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp 
     ${IMGUI_DIR}/imgui.cpp 

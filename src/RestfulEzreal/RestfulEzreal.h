@@ -51,7 +51,7 @@ namespace restfulEz {
 
             void OnUIRender();
             int render_welcome();
-            void render_welcome_config();
+            int render_welcome_config();
             QUERY_FORM* _next_request = nullptr;
 
         private:

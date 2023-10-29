@@ -1,3 +1,5 @@
+#pragma once
+#include "imgui_internal.h"
 #include <imgui.h>
 #include <string>
 #include <concepts>
@@ -171,5 +173,9 @@ namespace re_utils {
         ImGui::PopFont();
         return sze;
     }
+
+    void form_center_aligned(const float center_align, const float right_align, 
+                             const char* title, const char* ID, char* to_write, 
+                             const int size, const ImGuiInputFlags flags, bool* highlight);
 
 };

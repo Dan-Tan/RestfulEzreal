@@ -3,6 +3,7 @@
 #include "imgui_internal.h"
 #include "BatchRequests.h"
 #include "RequestQueue.h"
+#include "utils/utils.h"
 #include <ranges>
 #include <bits/utility.h>
 #include <iterator>
@@ -377,11 +378,15 @@ namespace restfulEz {
 
     template<std::size_t N>
     void LinkedForm<N>::render_routing() {
-        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[1]);
-        ImGui::Text("ROUTING : ");
-        ImGui::SameLine();
-        ImGui::InputText(this->p_name_id[0].data(), this->_params_in_form[0].param, 256, this->_type_ordering[0]);
-        ImGui::PopFont();
+        ImVec2 avail = ImGui::GetCurrentWindow()->Size;
+        ImGuiStyle& style = ImGui::GetStyle();
+        static bool hlg = false;
+        re_utils::form_center_aligned(avail.x * 0.5, avail.x - style.WindowPadding.x * 4, "Routing", this->p_name_id[0].data(), this->_params_in_form[0].param, 256, this->_type_ordering[0], &hlg);
+        //ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[4]);
+        //ImGui::Text("ROUTING : ");
+        //ImGui::SameLine();
+        //ImGui::InputText(this->p_name_id[0].data(), this->_params_in_form[0].param, 256, this->_type_ordering[0]);
+        //ImGui::PopFont();
     }
     
     template<std::size_t N>

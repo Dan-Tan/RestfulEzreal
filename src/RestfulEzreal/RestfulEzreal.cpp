@@ -129,7 +129,7 @@ namespace restfulEz {
                     welcome = !this->start_up_from_existing(&ret);
                     break;
                 case 3:
-                    this->render_welcome_config(); break;
+                    ret = this->render_welcome_config(); break;
                 case 4:
                     break;
                 case 5:
@@ -277,12 +277,26 @@ namespace restfulEz {
         return start_up_type;
     }
 
-    void RestfulEzreal::render_welcome_config() {
+    int RestfulEzreal::render_welcome_config() {
+        static ImGuiIO& io = ImGui::GetIO();
         re_utils::full_display();
         static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
+        int to_return = 3;
         ImGui::Begin("Welcome Config", NULL, window_flags);
-        this->conf_form<false>();
+        if (this->conf_form<false>()) {
+            this->custom_config_path = CONFIG_FILE_PATH;
+            to_return = 2; // client status dynamic
+        };
+        ImGui::SameLine();
+        ImGui::PushFont(io.Fonts->Fonts[1]);
+        ImGui::SetCursorPosX(io.DisplaySize.x * 0.5 - ImGui::CalcTextSize("RestfulEzreal;").x * 0.5);
+        ImGui::PopFont();
+        if (ImGui::Button("Cancel")) {
+            to_return = -1; // back to start
+        };
         ImGui::End();
+
+        return to_return;
     }
 
     static void render_recent_request(const std::string& req_name, const std::vector<std::string>& param_descriptions) {
@@ -562,9 +576,10 @@ namespace restfulEz {
         }
         ImGui::PopFont();
 
-        if constexpr (!in_popup) { ImGui::SetCursorPosX(x_ali); };
+        if constexpr (!in_popup) { ImGui::SetCursorPosX(io.DisplaySize.x*0.5 + sze.x * 0.5 - ImGui::CalcTextSize("Submit").x - 4 * ImGui::GetStyle().FramePadding.x); };
         ImGui::PushFont(io.Fonts->Fonts[0]);
         if (ImGui::Button("Submit")) { 
+            this->_path_to_output = path_to_output;
             write_config_file(api_key, path_to_log, path_to_output, verbosity, level_);
             this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
             this->request_sender->set_client(this->_underlying_client);

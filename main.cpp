@@ -389,7 +389,7 @@ public:
             ImGui::SetNextWindowPos(ImVec2(0, 0));
             ImGui::SetNextWindowSize(ImVec2(disp_size.x * 0.1225, disp_size.y));
 
-            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[2]);
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[3]);
 
             ImGui::Begin("Navigation", NULL, window_flags);
 
@@ -569,7 +569,7 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // navigBar->render();
+        navigBar->render();
         _main->OnUIRender();
 
         // Rendering
