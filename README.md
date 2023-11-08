@@ -6,7 +6,7 @@ I know it doesn't rhyme.
 
 - [Purpose](#goal/purpose)
 - [Iterative Linked Request](#iterative-linked-requests)
-- [Current Progress](#current-progrss)
+- [Current Progress](#current-progress)
 - [Dependencies](#dependencies)
 - [Build Instruction](#build-instructions)
 - [Disclaimer](#disclaimer)
@@ -32,7 +32,7 @@ In the current application this looks like the image below. Currently, the UI is
 
 ![Iterative Request](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/LinkedIterativeRequests.png?raw=true)
 
-## Current progress
+## Current Progress
 
 ![Entry Point](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/EntryScreen.png?raw=true "Entry")
 ![Config Page](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/ConfigPage.png?raw=true "Configuration Page")
