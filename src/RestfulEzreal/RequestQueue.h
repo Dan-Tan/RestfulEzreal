@@ -50,6 +50,7 @@ namespace restfulEz {
             ~RequestSender();
 
             void stop() {this->stop_execution = true;}
+            void start() {this->stop_execution = false;}
 
             void set_client(std::shared_ptr<client::RiotApiClient> client) {this->underlying_client = client;};
             void set_output_directory(const std::string& output) { this->output_directory = output; std::filesystem::create_directories(this->output_directory);}

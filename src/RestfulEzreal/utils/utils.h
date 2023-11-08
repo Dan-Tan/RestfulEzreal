@@ -178,4 +178,6 @@ namespace re_utils {
                              const char* title, const char* ID, char* to_write, 
                              const int size, const ImGuiInputFlags flags, bool* highlight);
 
+    void title_aligned(const float center_align, const char* title, const bool highlight);
+
 };

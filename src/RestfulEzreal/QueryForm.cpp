@@ -452,4 +452,63 @@ namespace restfulEz {
             frm->detach_base();
         }
     }
+
+    bool render_json_form(std::vector<KEY_CONT>& keys, const int ind, const float x_align, const float width, bool active_field, bool second) {
+
+        static char _id[] = "##00a";
+        _id[2] = (char) (ind + '0');
+        _id[4] = second ? 'b' : 'a';
+
+        char counter = '0';
+        bool active = false;
+        ImVec2 avail = ImGui::GetWindowSize();
+        for (KEY_CONT& key : keys) {
+            _id[3] = counter;
+            ImGui::SetCursorPosX(x_align);
+            ImGui::SetNextItemWidth(width - x_align - 0.5 * (x_align - avail.x * 0.25));
+            ImGui::InputTextWithHint(_id, "Json Key", key.key, KEY_LENGTH, ImGuiTextFlags_None);
+            active |= ImGui::IsItemActive();
+            counter++;
+        }
+        
+        // add button
+        static char _add_id[] = "Add##0a";
+        _add_id[5] = (char) (ind + '0');
+        _add_id[6] = second ? 'b' : 'a';
+        ImGui::SetCursorPosX(x_align);
+        if (ImGui::Button(_add_id)) {
+            keys.emplace_back("\0");
+            active = true;
+        }
+
+        // remove button
+        static char _del_id[] = "Remove##0a";
+        _del_id[8] = ind;
+        _del_id[9] = second ? 'b' : 'a';
+        
+        if (keys.size() != 0) {
+            ImGui::SameLine();
+            if (ImGui::Button(_del_id)) {
+                keys.pop_back();
+                active = true;
+            }
+        }
+
+        return active;
+
+    }
+
+    bool render_iter_json(std::vector<KEY_CONT>& before, std::vector<KEY_CONT>& after, char iter_limit[8], const int ind, bool active_field, const float x_align, const float width) {
+        bool active = render_json_form(before, ind, x_align, width, active_field, false);
+
+        static char _lim_id[] = "Iteration Limit##0";
+        _lim_id[17] = ind;
+        ImGui::SetCursorPosX(x_align);
+        ImGui::SetNextItemWidth(width - x_align - 0.5 * (x_align - ImGui::GetWindowSize().x * 0.25));
+        ImGui::InputText(_lim_id, iter_limit, 8, ImGuiInputTextFlags_CharsDecimal);
+        active |= ImGui::IsItemActive();
+
+        active |= render_json_form(after, ind, x_align, width, active_field, true);
+        return active;
+    }
 }

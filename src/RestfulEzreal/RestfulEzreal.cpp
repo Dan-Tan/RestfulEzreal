@@ -139,10 +139,15 @@ namespace restfulEz {
             }
         } else {
 
-        static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
+        static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration 
+                                             | ImGuiWindowFlags_NoMove 
+                                             | ImGuiWindowFlags_NoResize 
+                                             | ImGuiWindowFlags_NoTitleBar 
+                                             | ImGuiWindowFlags_NoBringToFrontOnFocus;
         static ImGuiIO& io = ImGui::GetIO();
         ImGui::SetNextWindowPos(ImVec2(0.1225 * io.DisplaySize.x, 0));
         ImGui::SetNextWindowSize(ImVec2((1-0.1225) * io.DisplaySize.x, io.DisplaySize.y));
+
         ImGui::Begin("RestfulEzreal", NULL, window_flags);
 
         // We want to check which page is selected on the nav bar and render the selected page
@@ -310,7 +315,7 @@ namespace restfulEz {
     void RestfulEzreal::render_client_status() {
 
         static bool open = true;
-        static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration;
+        static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize;
         ImGui::Begin("Client State", &open, window_flags);
         
         if (!this->_underlying_client) {

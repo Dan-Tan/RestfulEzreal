@@ -383,7 +383,7 @@ public:
 
 	void render() {
 
-            static ImVec2 disp_size = ImGui::GetIO().DisplaySize;
+            static ImVec2& disp_size = ImGui::GetIO().DisplaySize;
             static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
 
             ImGui::SetNextWindowPos(ImVec2(0, 0));

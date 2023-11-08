@@ -168,6 +168,8 @@ namespace restfulEz {
             bool configuring = false;
             std::vector<std::string> p_name_id;
 
+            std::size_t active_field = -1;
+
             // let user know if the form is finished
             bool ready = false;
 
@@ -330,101 +332,97 @@ namespace restfulEz {
         this->display_form.emplace_back("");
     }
 
-    static inline void render_json_form(std::vector<KEY_CONT>& keys, const int ind, bool second = false) {
-        
-        // render form input text
-        static char _id[] = "##00a";
-        _id[2] = ind;
-        _id[4] = second ? 'b' : 'a';
+    bool render_json_form(std::vector<KEY_CONT>& keys, const int ind, const float x_align, const float width, bool active_field, bool second = false);
 
-        char counter = '0';
-        for (KEY_CONT& key : keys) {
-            _id[3] = counter;
-            ImGui::InputText(_id, key.key, KEY_LENGTH, ImGuiTextFlags_None);
-            counter++;
-        }
-        
-        // add button
-        static char _add_id[] = "Add##0a";
-        _add_id[5] = ind;
-        _add_id[6] = second ? 'b' : 'a';
-
-        if (ImGui::Button(_add_id)) {
-            keys.emplace_back("");
-        }
-        
-
-        // remove button
-        static char _del_id[] = "Remove##0a";
-        _del_id[8] = ind;
-        _del_id[9] = second ? 'b' : 'a';
-
-        if (ImGui::Button(_del_id)) {
-            keys.pop_back();
-        }
-    }
-
-    static inline void render_iter_json(std::vector<KEY_CONT>& before, std::vector<KEY_CONT> after, char iter_limit[8], const int ind) {
-        render_json_form(before, ind, false);
-
-        static char _lim_id[] = "Iteration Limit##0";
-        _lim_id[17] = ind;
-        ImGui::InputText(_lim_id, iter_limit, 8, ImGuiInputTextFlags_CharsDecimal);
-
-        render_json_form(after, ind, true);
-
-        if (ImGui::Button("Select Parent")) {}; // todo
-    };
+    bool render_iter_json(std::vector<KEY_CONT>& before, std::vector<KEY_CONT>& after, char iter_limit[8], const int ind, bool active_field, const float x_ali, const float width);
 
     template<std::size_t N>
     void LinkedForm<N>::render_routing() {
         ImVec2 avail = ImGui::GetCurrentWindow()->Size;
         ImGuiStyle& style = ImGui::GetStyle();
         static bool hlg = false;
-        re_utils::form_center_aligned(avail.x * 0.5, avail.x - style.WindowPadding.x * 4, "Routing", this->p_name_id[0].data(), this->_params_in_form[0].param, 256, this->_type_ordering[0], &hlg);
-        //ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[4]);
-        //ImGui::Text("ROUTING : ");
-        //ImGui::SameLine();
-        //ImGui::InputText(this->p_name_id[0].data(), this->_params_in_form[0].param, 256, this->_type_ordering[0]);
-        //ImGui::PopFont();
+        re_utils::form_center_aligned(avail.x * 0.25, avail.x * 0.75, "Routing", this->p_name_id[0].data(), this->_params_in_form[0].param, 256, this->_type_ordering[0], &hlg);
+        if (hlg) {
+            this->active_field = 0;
+        }
     }
     
     template<std::size_t N>
     bool LinkedForm<N>::render_field(const std::size_t ind) {
 
+        ImVec2 avail = ImGui::GetCurrentWindow()->Size;
+        int n_lines;
+        if (this->iterative[ind]) {
+            n_lines = this->iter_info[ind-1]->keys.size() + this->iter_info[ind-1]->access_after_iter.keys.size() + 5;
+        } else if(this->linked[ind]) {
+            n_lines = this->iter_info[ind-1]->keys.size() + 3;
+        } else {
+            n_lines = 2;
+        }
+
+        ImVec2 windPadding = ImGui::GetStyle().WindowPadding;
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + windPadding.y); // add padding
+        ImVec2 winPos  = ImGui::GetWindowPos(); 
+        ImVec2 rec_min = ImVec2(winPos.x + windPadding.x, winPos.y + ImGui::GetCursorPosY());// + windPadding.y);
+        ImVec2 rec_max = ImVec2(winPos.x + avail.x - windPadding.x, winPos.y + ImGui::GetCursorPosY() + (ImGui::GetFrameHeightWithSpacing()) * n_lines + 1.5 * windPadding.y);
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRect(rec_min, rec_max, this->active_field==ind ? ImGui::ColorConvertFloat4ToU32(ImVec4(0.92f, 0.68f, 0.01f, 1.0f)) : 0x888888FF, 0.0f, 0, 1.0f);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + windPadding.y); // add padding
+
+        re_utils::title_aligned(avail.x * 0.25, this->_param_names[ind].name, this->active_field == ind);
+        ImGui::SameLine();
+        float x_align = ImGui::GetCursorPosX();
+        float r_align = avail.x * 0.75;
         // linking option checkboc
         bool linking = false;
         static char _link_id[] = "Linked##0";
         _link_id[8] = (char)ind;
         ImGui::Checkbox(_link_id, &this->linked[ind]);
+        if (ImGui::IsItemActive()) {
+            this->active_field = ind;
+        }
         
         static char _iter_id[] = "Iterative##0";
         _iter_id[11] = (char)ind;
         if (this->linked[ind]) {
-
+            ImGui::SameLine();
             ImGui::Checkbox(_iter_id, &this->iterative[ind]);
+            if (ImGui::IsItemActive()) {
+                this->active_field = ind;
+            }
             static char _link_but_id[]  = "Link Parent##0";
             _link_but_id[13] = (char) ind;
-
+            ImGui::SetCursorPosX(x_align);
             if (ImGui::Button("Link Parent")) {
                 this->next_index = ind;
                 linking = true;
                 this->configuring = false;
+                this->active_field = ind;
             }
             if (this->parents[ind-1] != nullptr) {
                 ImGui::SameLine();
                 if (ImGui::Button("Unlink Parent")) {
                     this->parents[ind-1]->delete_child(this);
                     this->parents[ind-1] = nullptr;
+                    this->active_field = ind;
                 }
             }
             if (this->iterative[ind]) {
-                render_iter_json(this->iter_info[ind-1]->keys, this->iter_info[ind-1]->access_after_iter.keys, this->iter_limits[ind-1], ind);
+                if (render_iter_json(this->iter_info[ind-1]->keys, this->iter_info[ind-1]->access_after_iter.keys, this->iter_limits[ind-1], ind, this->active_field == ind, x_align, r_align)) {
+                    this->active_field = ind;
+                }
             } else {
-                render_json_form(this->iter_info[ind-1]->keys, ind);
+                if (render_json_form(this->iter_info[ind-1]->keys, ind, x_align, r_align, this->active_field == ind, false)) {
+                    this->active_field = ind;
+                }
             }
         } else {
-            ImGui::InputText(this->_param_names[ind].name, this->_params_in_form[ind].param, P_INPUT_LENGTH, this->_type_ordering[ind]);
+            ImGui::SetCursorPosX(x_align);
+            ImGui::SetNextItemWidth(r_align - x_align - 0.5 * (x_align - avail.x * 0.25));
+            ImGui::InputTextWithHint(this->p_name_id[ind].data(), this->_param_names[ind].name, this->_params_in_form[ind].param, P_INPUT_LENGTH, this->_type_ordering[ind]);
+            if (ImGui::IsItemActive()) {
+                this->active_field = ind;
+            }
         }
         return linking;
     };
@@ -556,10 +554,12 @@ namespace restfulEz {
     template<std::size_t N>
     bool LinkedForm<N>::render_popup() {
         bool linking = false;
+        static ImGuiIO& io = ImGui::GetIO();
         ImGui::OpenPopup(this->popup_id.data());
 
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.5, io.DisplaySize.y * 0.75));
         
         bool open = true;
 
@@ -613,17 +613,36 @@ namespace restfulEz {
             throw std::logic_error("QUERY_FORM::render_optional should never be called for endpoints with no optional arguements");
         }
 
+        ImVec2 avail = ImGui::GetCurrentWindow()->Size;
+        ImVec2 windPadding = ImGui::GetStyle().WindowPadding;
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + windPadding.y); // add padding
+        ImVec2 winPos  = ImGui::GetWindowPos(); 
+        ImVec2 rec_min = ImVec2(winPos.x + windPadding.x, winPos.y + ImGui::GetCursorPosY());// + windPadding.y);
+        ImVec2 rec_max = ImVec2(winPos.x + avail.x - windPadding.x, winPos.y + ImGui::GetCursorPosY() + (ImGui::GetFrameHeightWithSpacing()) * (this->_n_used_optional_p1) + 1.5 * windPadding.y);
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRect(rec_min, rec_max, this->active_field==-2 ? ImGui::ColorConvertFloat4ToU32(ImVec4(0.92f, 0.68f, 0.01f, 1.0f)) : 0x888888FF, 0.0f, 0, 1.0f);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + windPadding.y); // add padding
+
+        re_utils::title_aligned(avail.x * 0.25, "Optional", this->active_field == -2);
+        ImGui::SameLine();
+        float x_align = ImGui::GetCursorPosX();
+        float r_align = avail.x * 0.75;
+
         static char id[5] = "x## ";
         static int opt_index = 0;
 
         // render input forms
         for (int i = 0; i < this->_optionals_to_send.size(); i++) {
-            float text_width = ImGui::GetContentRegionAvail().x * OPT_INPUT_TEXT_FRAC;
-            ImGui::PushItemWidth(text_width);
             if (this->_optionals_to_send[i] != 1) {
                 continue;
             }
+            float text_width = 0.5 * (r_align - x_align);
+            ImGui::SetCursorPosX(x_align);
+            ImGui::SetNextItemWidth(text_width);
             ImGui::InputText(this->_optional_names[i], this->_optional_inputs[i], 256, this->_optional_types[i]);
+            if (ImGui::IsItemActive()) {
+                this->active_field = -2;
+            }
 
             ImGui::SameLine(ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC - 2 * ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize("x").x);
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
@@ -633,10 +652,10 @@ namespace restfulEz {
                 this->_optionals_to_send[i] = 0;
                 this->_n_used_optional_p1 -= 1;
                 opt_index = i;
+                this->active_field = -2;
             };
-            ImGui::PopItemWidth();
         }
-
+        ImGui::SetCursorPosX(x_align);
         float drop_down_width = (0.3f * ImGui::GetContentRegionAvail().x);
         ImGui::SetNextItemWidth(drop_down_width);
         if (opt_index == -1) {
@@ -651,6 +670,7 @@ namespace restfulEz {
                     const bool is_selected = (opt_index == n);
                     if (ImGui::Selectable(this->_optional_names[n], is_selected)) {
                         opt_index = n;
+                        this->active_field = -2;
                     }
 
                     // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
@@ -662,13 +682,17 @@ namespace restfulEz {
             ImGui::EndCombo();
         }
 
+        if (this->_n_used_optional_p1 == this->_optionals_to_send.size()+1) {
+            return;
+        }
+
         // Render add optional button besides dropdown
         const static char button_name[] = "+";
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x * INPUT_TEXT_FRAC - 2 * ImGui::GetStyle().ItemSpacing.x - ImGui::CalcTextSize(button_name).x);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 10);
-
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(r_align - ImGui::CalcTextSize("+").x);
         if (ImGui::Button(button_name)) {
             if (this->_optionals_to_send[opt_index] == 0) {this->_n_used_optional_p1 += 1;};
+            this->active_field = -2;
             this->_optionals_to_send[opt_index] = 1;
             opt_index = find_next_focus(this->_optionals_to_send);
         }

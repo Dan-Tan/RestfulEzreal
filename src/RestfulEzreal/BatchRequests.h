@@ -92,13 +92,14 @@ namespace restfulEz {
     // JSON ACCESS INFO
         
     typedef struct json_access_info {
-        std::vector<KEY_CONT> keys;
+        std::vector<KEY_CONT> keys {};
         PARAM_CONT get_param(const raw_json& response) const;
     } json_access_info;
     
     typedef struct iter_access_info : json_access_info {
         std::size_t iter_limit = 0; // 0 - iter over all
         json_access_info access_after_iter;
+        iter_access_info() : json_access_info(), access_after_iter() {}
         
         json_access_info get_base() const;
         std::vector<PARAM_CONT> get_params(const raw_json& response) const; 

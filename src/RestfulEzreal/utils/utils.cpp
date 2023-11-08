@@ -36,4 +36,23 @@ namespace re_utils {
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }
+
+    void title_aligned(const float center_align, const char* title, const bool highlight) {
+        static ImGuiIO& io = ImGui::GetIO();
+
+        ImGui::PushFont(io.Fonts->Fonts[0]);
+        const ImVec2 title_size = ImGui::CalcTextSize(title);
+        ImGui::SetCursorPosX(center_align - title_size.x - ImGui::CalcTextSize(" ").x);
+
+        ImGui::PushStyleColor(ImGuiCol_Text, highlight ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f) : ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(title);
+
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(center_align);
+        ImGui::TextUnformatted(":");
+
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+    }
 }
