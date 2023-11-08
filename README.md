@@ -1,92 +1,95 @@
-# RESTFUL EZREAL (completely out of date)
+# RESTfulEzreal 
 
-I know it doesn't rhyme
+I know it doesn't rhyme.
+
+## Contents
+
+- [Purpose](#goal/purpose)
+- [Iterative Linked Request](#iterative-linked-requests)
+- [Current Progress](#current-progrss)
+- [Dependencies](#dependencies)
+- [Build Instruction](#build-instructions)
+- [Disclaimer](#disclaimer)
+## Goal/Purpose
+The goal of this application is to make access to Riot's API increadibly easy for users with programming experience. Aside from providing a simple GUI wrapper for single requests, RESTful Ezreal seeks to implement and will consider providing any feature that makes performing robust data analysis easy. The underlying client handles rate limiting and server errors ([riot-cpp](https://github.com/Dan-Tan/riot-cpp)).
+
+**Advanced data requests whilst maintaining data granularity.**
+
+
+
+## Iterative Linked Requests
+
+In order to retrieve large amounts of match data currently requires one to know how to code and use the plethora of [api wrappers](https://github.com/Dan-Tan/riot-api-libraries) available in a multitude of programming languages. However, many individuals are familiar with data analysis without the skill of programming, mostly through the use of excel or other spreadsheet applications. 
+
+RESTful Ezreal implements Iterative Linked Requests, whereby a user may construct a larger request that take input from each other to develop a larger database that they may analyse seperately. An example is the following request
+
+1. Get PUUID (universal ID) using Summoner v4 by name request
+1. Get Match History using PUUID from step 1.
+1. For each Match ID from step 2, send a Match v5 by match id request
+1. For each Match ID from step 2, send a Match v5 timeline request
+
+In the current application this looks like the image below. Currently, the UI is not so user friendly however this is currently a work in progress. The end goal is to develop a UI the allows use without knowledge of specifics of RIOT API data formats.
+
+![Iterative Request](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/LinkedIterativeRequests.png?raw=true)
+
+## Current progress
+
+![Entry Point](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/EntryScreen.png?raw=true "Entry")
+![Config Page](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/ConfigPage.png?raw=true "Configuration Page")
+![API Key tests](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/ServerTestPage.png?raw=true "Key Validation")
+![Iterative Request](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/LinkedIterativeRequests.png?raw=true "Iterative Linked Requests")
+![Simple Requests](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/SingularRequestPage.png?raw=true "Simple Requests")
 
 ## Dependencies
 
-Aside from the dependencies already in this project (Walnut, Imgui... All include as git submodules), we require the Vulkan SDK (OS specific), jsoncpp, curl (riot-cpp dependencies).
-
-I will make a repo for building in Visual Studio that isn't CMake. Coming soon.
+Aside from the dependencies already in this project (Walnut, Imgui... All include as git submodules), we require the Vulkan SDK (OS specific) and curl (riot-cpp dependencies). Specifically,
+ - [Dear ImGui](https://github.com/ocornut/imgui) UI library
+ - [Vulkan SDK](https://www.vulkan.org/) Dear ImGui Dependency
+ - [GLFW](https://www.glfw.org/) Dear ImGui Dependency
+ - [simdjson](https://github.com/simdjson/simdjson) Json Parser
+ - [riot-cpp](https://github.com/Dan-Tan/riot-cpp) c++ API Wrapper
+ - [libcURL](https://curl.se/libcurl/) inherited dependency from riot-cpp
 
 ## Build Instructions
 
-This run's fine on linux, most of these build instructions are for windows users.
+Currently, the build has only been tested on linux however the project is intended to be able to build on any OS using CMake, raise an issue if the build fails and I can fix.
 
-Please install visual studio with c++. I'm referring to microsoft visual studio not vscode. If you are using a different IDE you are welcome to use it whilst developing with us but I;m not going to provide build instructions. You are welcome to create a pull request to improve compatability.
-
-All of this assumes you have git already installed. I have been using git bash instead of command prompt.
-
-### 0. Cloning the project repository.
-
-Do not forget the --recurse-submodules add the end as the repo contains submodules so they we can maintain up to date dependencies.
+#### 1. Clone with submodules
 
 ```bash
-# with SSH
-git clone git@github.com:Dan-Tan/RestfulEzreal.git --recurse-submodules
-# with HTTPS
 git clone https://github.com/Dan-Tan/RestfulEzreal.git --recurse-submodules
 ```
 
-### 1. Install VCPKG
-
-To make package management easier and because I'm not too comfortable with CMAKE and Visual Studio I used VCPKG to help with install, setting environment variables and so on.
-
-Set up Visual Studio before this.
+#### 2. Build with CMake
 
 ```bash
-git clone https://github.com/Microsoft/vcpkg.git # cloning the vcpkg directory
-
-./vcpkg/bootstrap-vcpkg.sh # build vcpkg
-
-./vcpkg integrate install # "linking" vcpkg with visual studio
-```
-
-### 2. Installing CURL and Jsoncpp
-
-Identify the architecture of your computer
-
-```bash
-# installing curl
-./vcpkg install curl --triplet=<TRIPLET>
-# installing jsoncpp
-./vcpkg install jsoncpp --triplet=<TRIPLET>
-```
-
-For example, 64 bit windows
-
-```bash
-# Example for 64 bit windows
-./vcpkg install curl --triplet=x64-windows
-./vcpkg install jsoncpp --triplet=x64-windows
-```
-
-### 3. Installing the Vulkan SDK
-
-Vulkan should take care of environment path for you so it should be as simple as following the download instructions.
-
-The SDK to download can be found [here](https://vulkan.lunarg.com/)
-
-### 4. Opening with visual studio from directory.
-
-Open visual studio and select "Open a local folder" under get started on the right.
-
-Select the folder RestfulEzreal, this should be the directory you cloned.
-
-Under "Project", select "Configure Cache".
-
-Under "Build", select build all.
-
-In the directory, "RestfulEzreal/build/x64-Debug" there will be an executable (.exe) file that is the app.
-
-(Just "RestfuEzreal/build" if on linux)
-
-If on linux. 
-
-```bash
-# assuming current directory is RestfulEzreal (root of project)
-mkdir build & cd build
+mkdir build && cd build
 cmake ..
 make
 ```
 
+#### 2o. Debug Build (optional for dev)
 
+If you are contributing you most likely want to build in Debug mode for Debug symbols. There are also a few debug macros to make debugging easier.
+
+```bash
+mkdir Debug && cd Debug
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make
+```
+
+#### 3. Run Executeable
+
+The executable will be named Restful-Ezreal with different file suffixes depending on the OS you use. For linux, the program can be ran as follows
+
+```bash
+cd build && ./Restful-Ezreal
+# if Debug
+cd Debug && ./Restful-Ezreal
+# or simply 
+cd <insert build dir> && ./Restful-Ezreal
+```
+
+## Disclaimer
+
+Restful Ezreal isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
