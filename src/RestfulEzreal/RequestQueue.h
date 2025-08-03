@@ -41,9 +41,9 @@ namespace restfulEz {
             std::queue<std::function<void()>> work;
 
             // test display lock vars
-            bool test_in_progress                      = false;
+            bool test_in_progress = false;
             std::array<int,    16> region_avail = { 0 };
-            static constexpr std::array<char[5], 16> regions      = {"BR1" ,"EUN1" ,"EUW1" ,"JP1" ,"KR" ,"LA1" ,"LA2" ,"NA1" ,"OC1" ,"TR1" ,"RU" ,"PH2" ,"SG2" ,"TH2" ,"TW2" ,"VN2"};
+            static constexpr std::array<char[5], 16> regions = {"BR1" ,"EUN1" ,"EUW1" ,"JP1" ,"KR" ,"LA1" ,"LA2" ,"NA1" ,"OC1" ,"TR1" ,"RU" ,"PH2" ,"SG2" ,"TH2" ,"TW2" ,"VN2"};
 
         public:
             RequestSender();
@@ -52,7 +52,18 @@ namespace restfulEz {
             void stop() {this->stop_execution = true;}
             void start() {this->stop_execution = false;}
 
-            void set_client(std::shared_ptr<client::RiotApiClient> client) {this->underlying_client = client;};
+            void set_client(std::shared_ptr<client::RiotApiClient> client) {
+                this->underlying_client = client;
+                this->region_avail = { 0 }; // reset availabilities
+                {
+                    std::unique_lock<std::mutex> lock(this->queue_mutex);
+                    this->simple_requests = std::queue<request>();
+                    this->linked_requests = std::queue<std::shared_ptr<BatchRequest>>();
+                }
+                // request insertion obtains mutex by itself
+                this->test_regions();
+                condition.notify_one();
+            };
             void set_output_directory(const std::string& output) { this->output_directory = output; std::filesystem::create_directories(this->output_directory);}
 
             void add_request(request task);
@@ -65,13 +76,13 @@ namespace restfulEz {
             
             // for start up display
             int region_test_display();
-            void test_regions();
 
             std::string recent_request = "No Requests Sent.";
             std::vector<std::string> recent_params = {};
 
         private: // methods
             void worker();
+            void test_regions();
 
             using raw_json = std::vector<char>;
             void write_response_file(const request& task, const raw_json& result);

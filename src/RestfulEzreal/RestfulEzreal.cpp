@@ -775,6 +775,7 @@ namespace restfulEz {
         this->_underlying_client = std::make_shared<client::RiotApiClient>(file_path, log_path, loglevel, verbosity);
         this->request_sender->set_client(this->_underlying_client);
         this->request_sender->set_output_directory(this->_path_to_output);
+        this->batch_group->set_sender(this->request_sender);
     }
 
     bool RestfulEzreal::start_up_from_existing(int* ret) {
@@ -794,7 +795,6 @@ namespace restfulEz {
             ImGui::PopFont();
 
             this->request_sender->add_generic(std::bind(&RestfulEzreal::instantiate_client, this, &instantiate_success, &successful_parse, this->custom_config_path));
-            this->request_sender->test_regions();
             calc_once = false;
         }
         const float x_begin = io.DisplaySize.x * 0.5 - x_sze;

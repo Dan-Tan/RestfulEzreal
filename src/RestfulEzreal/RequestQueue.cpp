@@ -244,9 +244,10 @@ namespace restfulEz {
         while (!next.same_endpoint(BatchRequest::FINISHED)) {
             D("Sending Request (game: " << next._game << ",endpoint: " << next._endpoint << ", method: " << next._endpoint_method << ")");
             result = this->Send_Request(next);
+            D("Response: " << result->data());
             while (batch->insert_result(std::move(result))) {
                 next = batch->get_current();
-                this->Send_Request(next);
+                result = this->Send_Request(next);
             }
             next = batch->get_next();
         }
