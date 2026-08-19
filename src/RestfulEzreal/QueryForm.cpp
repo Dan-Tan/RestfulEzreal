@@ -436,22 +436,36 @@ namespace restfulEz {
     void BatchForm::execute_request() {
         bool ready = true;
         for (const auto& form : this->forms) {
-            ready &= form->check_ready();
+            if (form) {
+                ready &= form->check_ready();
+            }
         }
         if (!ready) {
-            // ot all the forms are ready to be executed
-            // DO SOMETHING HERE TO NOT THE USER
+            std::cout << "[BatchForm] Not all forms are ready for execution." << std::endl;
             return;
         }
 
         std::shared_ptr<BatchRequest> final_form = this->construct_request();
-        this->sender->add_batch_request(final_form);
+        if (!final_form) {
+            std::cerr << "[BatchForm] Failed to construct batch request." << std::endl;
+            return;
+        }
+
+        if (this->sender) {
+            std::cout << "[BatchForm] Enqueuing batch request..." << std::endl;
+            this->sender->add_batch_request(final_form);
+        } else {
+            std::cerr << "[BatchForm] ERROR: sender is null on BatchForm!" << std::endl;
+        }
         
         // remove forms pointer to original pointer to prevent uses interference during requests
         for (auto& frm : this->forms) {
-            frm->detach_base();
+            if (frm) {
+                frm->detach_base();
+            }
         }
     }
+
 
     bool render_json_form(std::vector<KEY_CONT>& keys, const int ind, const float x_align, const float width, bool active_field, bool second) {
 

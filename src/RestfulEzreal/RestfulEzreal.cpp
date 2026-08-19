@@ -85,10 +85,11 @@ namespace restfulEz {
     RestfulEzreal::RestfulEzreal(current_page* on_display) {
         this->_on_display = on_display;
         this->batch_group = std::make_shared<BatchForm>();
+        this->batch_group->set_sender(this->request_sender);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
         set_colours();
-
     };
+
 
     static std::string config_file_dialog() {
         NFD_Init();
@@ -700,10 +701,12 @@ namespace restfulEz {
     }
 
     void RestfulEzreal::render_advanced_requests() {
-
-        this->batch_group->render_form();
-
+        if (this->batch_group) {
+            this->batch_group->set_sender(this->request_sender);
+            this->batch_group->render_form();
+        }
     }
+
 
     static std::unique_ptr<std::string> display_custom_file(const std::string& path, const float x_begin, const float x_end) {
         /*
