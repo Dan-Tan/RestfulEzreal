@@ -216,11 +216,12 @@ namespace restfulEz {
         if (task.success_ptr) {
             *task.success_ptr = failure ? 2 : 1;
         }
-        if (response && !response->empty()) {
+        if (!failure && response && !response->empty()) {
             this->write_response_file(task, *response);
         }
         return response;
     }
+
 
     json_ptr RequestSender::Send_Riot(request& task) {
         std::vector<PARAM_CONT>& params = task.params;

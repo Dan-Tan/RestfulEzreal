@@ -445,12 +445,20 @@ bool DatabaseManager::SaveMatch(const std::string& match_id, const std::string& 
         simdjson::dom::parser parser;
         simdjson::dom::element doc;
         if (parser.parse(padded).get(doc) == simdjson::SUCCESS) {
+            // Reject error responses
+            if (doc["status"].error() == simdjson::SUCCESS) {
+                return false;
+            }
+            simdjson::dom::element info;
+            if (doc["info"].get(info) != simdjson::SUCCESS) {
+                return false;
+            }
+
             std::string_view mid_sv;
             if (doc["metadata"]["matchId"].get(mid_sv) == simdjson::SUCCESS && !mid_sv.empty()) {
                 actual_match_id = std::string(mid_sv);
             }
 
-            simdjson::dom::element info = doc["info"];
 
             int64_t val_int = 0;
             if (info["gameCreation"].get(val_int) == simdjson::SUCCESS) {
