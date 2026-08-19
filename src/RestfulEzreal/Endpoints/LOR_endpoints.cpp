@@ -103,14 +103,14 @@ namespace restfulEz {
                         case M_BY_PUUID:
                             response = this->underlying_client->Lor_Match.by_puuid(params.at(0), params.at(1));break;
                         case M_BY_MATCH:
-                            response = this->underlying_client->Lor_Match.by_match(params.at(0), params.at(1));break;
+                            response = this->underlying_client->Lor_Match.by_match_id(params.at(0), params.at(1));break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method for LOR_MATCH, greater then 1 (strictly)");
                     }break;
                 case RANKED:
                     response = this->underlying_client->Lor_Ranked.leaderboards(params.at(0));break;
                 case STATUS:
-                    response = this->underlying_client->Lor_Status.v1(params.at(0));break;
+                    response = this->underlying_client->Lor_Status.status(params.at(0));break;
                 default:
                     throw std::invalid_argument("Invalid Endpoint given, greater then 2 (strictly)");
             }

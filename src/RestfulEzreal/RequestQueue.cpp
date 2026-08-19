@@ -1,9 +1,14 @@
 #include "RequestQueue.h"
 #include "BatchRequests.h"
+#include "FileManager.h"
+#include "db/DatabaseManager.h"
 #include "imgui.h"
 #include "utils/utils.h"
+#include "simdjson.h"
 #include <stdexcept>
 #include <filesystem>
+#include <chrono>
+#include <fstream>
 
 #define NUM_REGIONS 16
 
@@ -67,12 +72,19 @@ namespace restfulEz {
                     throw std::logic_error("Request thread continued with no tasks");
                 }
             };
-            if (iterative) {
-                this->Send_Batch_Request(b_task);
-            } else if (singular) {
-                this->Send_Request(task);
-            } else {
-                generic_work();
+
+            try {
+                if (iterative) {
+                    this->Send_Batch_Request(b_task);
+                } else if (singular) {
+                    this->Send_Request(task);
+                } else if (generic_work) {
+                    generic_work();
+                }
+            } catch (const std::exception& ex) {
+                std::cerr << "[RequestSender] Exception in background worker: " << ex.what() << std::endl;
+            } catch (...) {
+                std::cerr << "[RequestSender] Unknown exception in background worker." << std::endl;
             }
         }
     }
@@ -149,89 +161,167 @@ namespace restfulEz {
     using json_ptr = std::unique_ptr<std::vector<char>>;
 
     static bool check_failure_response(const std::vector<char>& response) {
-        try {
-            bool failure = response[2] == 's'
-                        && response[3] == 't'
-                        && response[4] == 'a'
-                        && response[5] == 't'
-                        && response[6] == 'u'
-                        && response[7] == 's';
-            return failure;
-        }
-        catch (std::out_of_range& ex) {
-            return true; // request failed
-        }
-
+        if (response.size() < 8) return false;
+        std::string_view sv(response.data(), std::min<size_t>(response.size(), 40));
+        return (sv.find("\"status\"") != std::string_view::npos);
     }
 
     json_ptr RequestSender::Send_Request(request& task) {
-
-        this->recent_request = std::string(GAMES_[task._game]) + " | " + std::string(GAME_ENDPOINTS_[task._game][task._endpoint]) + " | " + std::string(ENDPOINT_METHODS_[task._game][task._endpoint][task._endpoint_method]);
-        if (this->recent_params.size() != 0) {
-            this->recent_params.clear();
+        if (!this->underlying_client) {
+            std::cerr << "[RequestSender] RiotApiClient is not initialized." << std::endl;
+            if (task.success_ptr) *task.success_ptr = 2;
+            return nullptr;
         }
+
+        try {
+            this->recent_request = std::string(GAMES_[task._game]) + " | " + std::string(GAME_ENDPOINTS_[task._game][task._endpoint]) + " | " + std::string(ENDPOINT_METHODS_[task._game][task._endpoint][task._endpoint_method]);
+        } catch (...) {
+            this->recent_request = "Unknown Request";
+        }
+
+        this->recent_params.clear();
         for (PARAM_CONT& param : task.params) {
             this->recent_params.emplace_back(param.param);
         }
 
-        json_ptr response;
-        switch (task._game) {
-            case 0: // RIOT
-                response = this->Send_Riot(task); break;
-            case 1: // LEAGUE OF LEGENDS
-                response = this->Send_LOL(task); break;
-            case 2: // TEAMFIGHT TACTICS
-                response = this->Send_TFT(task); break;
-            case 3: // VALORANT
-                response = this->Send_VAL(task); break;
-            case 4: // LEGENDS OF RUNETERR
-                response = this->Send_LOR(task); break;
-            default:
-                throw std::invalid_argument("Invalid Game Index");
+        json_ptr response = nullptr;
+        try {
+            switch (task._game) {
+                case 0: // RIOT
+                    response = this->Send_Riot(task); break;
+                case 1: // LEAGUE OF LEGENDS
+                    response = this->Send_LOL(task); break;
+                case 2: // TEAMFIGHT TACTICS
+                    response = this->Send_TFT(task); break;
+                case 3: // VALORANT
+                    response = this->Send_VAL(task); break;
+                case 4: // LEGENDS OF RUNETERRA
+                    response = this->Send_LOR(task); break;
+                default:
+                    std::cerr << "[RequestSender] Invalid Game Index: " << task._game << std::endl;
+                    if (task.success_ptr) *task.success_ptr = 2;
+                    return nullptr;
+            }
+        } catch (const std::exception& ex) {
+            std::cerr << "[RequestSender] Exception sending request: " << ex.what() << std::endl;
+            if (task.success_ptr) *task.success_ptr = 2;
+            return nullptr;
         }
-        bool failure = response->size() == 0 || check_failure_response(*response);
+
+        bool failure = (!response || response->empty() || check_failure_response(*response));
         if (task.success_ptr) {
             *task.success_ptr = failure ? 2 : 1;
         }
-        this->write_response_file(task, *response);
-        return std::move(response);
+        if (response && !response->empty()) {
+            this->write_response_file(task, *response);
+        }
+        return response;
     }
 
     json_ptr RequestSender::Send_Riot(request& task) {
-        std::vector<PARAM_CONT> & params = task.params;
+        std::vector<PARAM_CONT>& params = task.params;
+        if (!this->underlying_client) return nullptr;
 
         switch (task._endpoint_method) {
             case 0:
-                return std::move(this->underlying_client->Account.by_puuid(params.at(0), params.at(1))); break;
+                if (params.size() < 2) throw std::invalid_argument("Account by_puuid requires 2 parameters (Routing, PUUID)");
+                return this->underlying_client->Account.by_puuid(params[0].param, params[1].param);
             case 1:
-                return std::move(this->underlying_client->Account.by_riot_id(params.at(0), params.at(1), params.at(2))); break;
+                if (params.size() < 3) throw std::invalid_argument("Account by_riot_id requires 3 parameters (Routing, Game Name, Tagline)");
+                return this->underlying_client->Account.by_riot_id(params[0].param, params[1].param, params[2].param);
             case 2:
-                return std::move(this->underlying_client->Account.by_game(params.at(0), params.at(1), params.at(2))); break;
+                if (params.size() < 3) throw std::invalid_argument("Account by_game_by_puuid requires 3 parameters (Routing, Game, PUUID)");
+                return this->underlying_client->Account.by_game_by_puuid(params[0].param, params[1].param, params[2].param);
             default:
-                throw std::move("Given ivnalid endpoint method index for Riot Accout endpoint");
+                throw std::invalid_argument("Invalid endpoint method index for Riot Account endpoint");
         }
     }
 
     using raw_json = std::vector<char>;
 
     void RequestSender::write_response_file(const request& task, const raw_json& result) {
-        // write more informative file names
+        if (result.size() == 0) return;
+
+        // Strip trailing null characters (\0) which riot-cpp appends to response_content
+        size_t valid_len = result.size();
+        while (valid_len > 0 && result[valid_len - 1] == '\0') {
+            valid_len--;
+        }
+        if (valid_len == 0) return;
+
         const int game = task._game;
         const int endpoint = task._endpoint;
         const int endpoint_method = task._endpoint_method;
 
-        static int counter = 0; // change as well
+        std::string identifier = "";
+        if (game == 0 && task.params.size() >= 3) {
+            identifier = std::string(task.params[1].param) + "_" + std::string(task.params[2].param);
+        } else if (task.params.size() > 0) {
+            identifier = task.params[0].param;
+        }
 
-        std::string file_output = this->output_directory + std::string("req") + std::to_string(game) + std::to_string(endpoint)+ std::to_string(endpoint_method) + std::to_string(counter);
-        file_output.append(".json");
+        // 1. Write structured JSON file using FileManager (without trailing null byte)
+        std::filesystem::path file_output = FileManager::GetInstance().GetRawOutputPath(game, endpoint, endpoint_method, identifier);
+        try {
+            if (file_output.has_parent_path()) {
+                std::filesystem::create_directories(file_output.parent_path());
+            }
+            std::ofstream output(file_output, std::ios::trunc);
+            if (output.is_open()) {
+                output.write(result.data(), valid_len);
+                output.close();
+            }
+        } catch (const std::exception& ex) {
+            std::cerr << "[RequestSender] Error writing response file: " << ex.what() << std::endl;
+        }
 
-        std::ofstream output;
+        // 2. Stream response into DuckDB database if initialized
+        if (DatabaseManager::GetInstance().IsInitialized()) {
+            std::string dev_prefix = FileManager::GetInstance().GetDevKeyPrefix();
 
-        output.open(file_output);
-        output << result.data();
-        output.close();
+            // Riot Account-v1 (Game: 0, Endpoint: 0)
+            if (game == 0 && endpoint == 0) {
+                try {
+                    simdjson::padded_string padded(result.data(), valid_len);
+                    simdjson::dom::parser parser;
+                    simdjson::dom::element doc;
+                    if (parser.parse(padded).get(doc) == simdjson::SUCCESS) {
+                        std::string puuid = "", game_name = "", tag_line = "";
+                        std::string_view sv;
+                        if (doc["puuid"].get(sv) == simdjson::SUCCESS) {
+                            puuid = std::string(sv);
+                        }
+                        if (doc["gameName"].get(sv) == simdjson::SUCCESS) {
+                            game_name = std::string(sv);
+                        }
+                        if (doc["tagLine"].get(sv) == simdjson::SUCCESS) {
+                            tag_line = std::string(sv);
+                        }
 
-        counter++;
+                        if (!game_name.empty() && !tag_line.empty()) {
+                            DatabaseManager::GetInstance().SaveAccount(dev_prefix, puuid, game_name, tag_line);
+                            std::cout << "[DatabaseManager] Ingested account: " << game_name << "#" << tag_line << std::endl;
+                        }
+                    }
+                } catch (const std::exception& ex) {
+                    std::cerr << "[RequestSender] Account JSON parse error: " << ex.what() << std::endl;
+                }
+            }
+            // League Match-v5 (Game: 1, Endpoint: 6, Method: 0 [Match] or 1 [Timeline])
+            else if (game == 1 && endpoint == 6) {
+                if (task.params.size() > 0) {
+                    std::string match_id = task.params[0].param;
+                    std::string raw_str(result.data(), valid_len);
+                    if (endpoint_method == 0) {
+                        DatabaseManager::GetInstance().SaveMatch(match_id, raw_str);
+                        std::cout << "[DatabaseManager] Ingested match: " << match_id << std::endl;
+                    } else if (endpoint_method == 1) {
+                        DatabaseManager::GetInstance().SaveTimeline(match_id, raw_str);
+                        std::cout << "[DatabaseManager] Ingested timeline: " << match_id << std::endl;
+                    }
+                }
+            }
+        }
     }
 
     void RequestSender::Send_Batch_Request(std::shared_ptr<BatchRequest> batch) {
@@ -246,7 +336,7 @@ namespace restfulEz {
             result = this->Send_Request(next);
             while (batch->insert_result(std::move(result))) {
                 next = batch->get_current();
-                this->Send_Request(next);
+                result = this->Send_Request(next);
             }
             next = batch->get_next();
         }

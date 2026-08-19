@@ -8,6 +8,8 @@
 #include "BatchRequests.h"
 #include "client/client.h"
 
+namespace client = riotcpp::client;
+
 namespace restfulEz {
 
     class RequestSender {

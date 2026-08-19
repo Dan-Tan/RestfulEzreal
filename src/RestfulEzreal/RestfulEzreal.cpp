@@ -10,6 +10,7 @@
 #include <string_view>
 #include <tuple>
 #include "RestfulEzreal.h"
+#include "FileManager.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "simdjson.h"
@@ -319,25 +320,79 @@ namespace restfulEz {
         ImGui::Begin("Client State", &open, window_flags);
         
         if (!this->_underlying_client) {
-            ImGui::Text("Client not intialised");
+            ImGui::Text("Client not initialised");
             ImGui::End();
             return;
         }
+
+        static bool show_key_modal = false;
+        static char quick_key[256] = "";
+
+        if (ImGui::Button("Update API Key##QuickKeyBtn")) {
+            show_key_modal = true;
+            strncpy(quick_key, FileManager::GetInstance().GetApiKey().c_str(), sizeof(quick_key) - 1);
+        }
+        ImGui::SameLine();
         static bool reconfiguring = false;
-        if (ImGui::Button("Reconfigure Client")) {
+        if (ImGui::Button("Settings / Workspace")) {
             reconfiguring = true;
         }
+
+        if (show_key_modal) {
+            ImGui::OpenPopup("Update Riot API Key");
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            if (ImGui::BeginPopupModal("Update Riot API Key", &show_key_modal, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Text("Enter new 24h Riot Developer API Key:");
+                ImGui::InputText("##NewKeyInput", quick_key, sizeof(quick_key));
+                if (ImGui::Button("Save##QuickKeySave")) {
+                    if (quick_key[0] != '\0') {
+                        FileManager::GetInstance().SetApiKey(quick_key);
+                        FileManager::GetInstance().SaveConfig(CONFIG_FILE_PATH);
+                        if (this->_underlying_client) {
+                            this->_underlying_client->update_api_key(quick_key);
+                        }
+                    }
+                    show_key_modal = false;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel##QuickKeyCancel")) {
+                    show_key_modal = false;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+        }
+
         if (reconfiguring) {
             if (this->configure_new_client(true)) {
                 reconfiguring = false;
-            }// allow the user to close the modal incase of not wanting to reconfigure
+            }
         }
+
+        std::string current_key = FileManager::GetInstance().GetApiKey();
+        if (!current_key.empty()) {
+            std::string masked = current_key.substr(0, std::min<size_t>(10, current_key.length())) + "...";
+            ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "API Key: %s", masked.c_str());
+        }
+
+        std::string ws_path = FileManager::GetInstance().GetWorkspacePaths().root_dir.string();
+        ImGui::Text("Workspace: %s", ws_path.c_str());
 
         render_recent_request(this->request_sender->recent_request, this->request_sender->recent_params);
 
+        ImGui::Separator();
+        ImGui::Text("Database (DuckDB):");
+        if (DatabaseManager::GetInstance().IsInitialized()) {
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "  Status: Connected");
+            ImGui::Text("  Players in DB: %ld", static_cast<long>(DatabaseManager::GetInstance().GetPlayerCount()));
+            ImGui::Text("  Matches in DB: %ld", static_cast<long>(DatabaseManager::GetInstance().GetMatchCount()));
+        } else {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "  Status: Not Initialized");
+        }
+
         ImGui::End();
-
-
     };
 
     void RestfulEzreal::render_home() {
@@ -417,7 +472,7 @@ namespace restfulEz {
         }
     }
 
-    static void write_config_file(const char api_key[256], const char path_to_log[64], const char path_to_output[64], const bool verbosity, const logging::LEVEL level_) {
+    static void write_config_file(const char api_key[256], const char path_to_log[64], const char path_to_output[64], const bool verbosity, const spdlog::level::level_enum level_) {
         // format config file as json
 
         std::ofstream config_file(CONFIG_FILE_PATH, std::ios::trunc);
@@ -434,25 +489,17 @@ namespace restfulEz {
     }
 
     void RestfulEzreal::configure_from_existing(bool custom_path, const std::string& file_path) {
-            simdjson::ondemand::parser parser;
-            simdjson::padded_string contents;
-            if (custom_path) {
-                contents = simdjson::padded_string::load(file_path);
-            } else {
-                contents = simdjson::padded_string::load(CONFIG_FILE_PATH);
-            }
-            simdjson::ondemand::document doc = parser.iterate(contents);
+        std::string target_config = custom_path ? file_path : CONFIG_FILE_PATH;
+        FileManager::GetInstance().LoadConfig(target_config);
+        const auto& cfg = FileManager::GetInstance().GetConfig();
 
-            logging::LEVEL report_level = static_cast<logging::LEVEL>(doc["log-level"].get_int64().value());
-            this->_path_to_output = doc["output-path"].get_string().value();
+        this->_path_to_output = cfg.active_workspace_path;
+        this->_underlying_client = std::make_shared<client::RiotApiClient>(cfg.api_key, cfg.log_path, cfg.log_level, cfg.verbosity, true);
+        this->request_sender->set_client(this->_underlying_client);
+        this->request_sender->set_output_directory(this->_path_to_output);
+        this->batch_group->set_sender(this->request_sender);
 
-            std::string log_path;
-            log_path = doc["log-path"].get_string().value();
-
-            this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, log_path, report_level, doc["verbosity"].get_bool().value());
-            this->request_sender->set_client(this->_underlying_client);
-            this->request_sender->set_output_directory(this->_path_to_output);
-            this->batch_group->set_sender(this->request_sender);
+        DatabaseManager::GetInstance().Init(FileManager::GetInstance().GetWorkspacePaths().db_file.string());
     }
     
     template<bool in_popup>
@@ -466,11 +513,10 @@ namespace restfulEz {
          * x_align    - float to align all fields to
          */
 
-
         static ImGuiIO& io = ImGui::GetIO();
 
         ImGui::PushFont(io.Fonts->Fonts[0]);
-        if constexpr (!in_popup) { ImGui::SetCursorPosX(x_align); } // dont align in popups only title
+        if constexpr (!in_popup) { ImGui::SetCursorPosX(x_align); }
         if (*active) { ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f)); }
         ImGui::Text(title);
         ImGui::PopFont();
@@ -481,7 +527,7 @@ namespace restfulEz {
             static bool frst = true;
             static float txt_width;
             if (frst) {
-                ImGui::PushFont(io.Fonts->Fonts[1]); // width of title 
+                ImGui::PushFont(io.Fonts->Fonts[1]);
                 txt_width = ImGui::CalcTextSize("RESTfulEzreal;").x;
                 ImGui::PopFont();
             }
@@ -501,12 +547,20 @@ namespace restfulEz {
     bool RestfulEzreal::conf_form() {
         static char api_key[256] = "";
         static char path_to_log[64] = "";
-        static char path_to_output[64] = "";
+        static char path_to_output[256] = "";
         static bool verbosity = false;
-        static bool selected[5] = {};
+        static bool init_fields = true;
+
+        if (init_fields && FileManager::GetInstance().IsLoaded()) {
+            const auto& cfg = FileManager::GetInstance().GetConfig();
+            strncpy(api_key, cfg.api_key.c_str(), sizeof(api_key) - 1);
+            strncpy(path_to_log, cfg.log_path.c_str(), sizeof(path_to_log) - 1);
+            strncpy(path_to_output, cfg.active_workspace_path.c_str(), sizeof(path_to_output) - 1);
+            verbosity = cfg.verbosity;
+            init_fields = false;
+        }
 
         static bool submit = false;
-
         static ImGuiIO& io = ImGui::GetIO();
         
         // computing align value
@@ -533,16 +587,23 @@ namespace restfulEz {
             x_ali = 1.0f;
         }
         
-        // highlight array
         static bool highlight[3] = { false, false, false };
-        //render_fields;
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f)); // dull color
-        render_field<in_popup>(256, api_key,        "API-KEY:",     "##API-KEY", ImGuiInputTextFlags_None, &highlight[0], x_ali);
-        render_field<in_popup>(64,  path_to_log,    "LOG PATH:",    "##LogPath", ImGuiInputTextFlags_None, &highlight[1], x_ali);
-        render_field<in_popup>(256, path_to_output, "OUTPUT PATH:", "##OutPath", ImGuiInputTextFlags_None, &highlight[2], x_ali);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.58f, 0.58f, 0.58f, 1.0f));
+        render_field<in_popup>(256, api_key,        "API-KEY:",        "##API-KEY", ImGuiInputTextFlags_None, &highlight[0], x_ali);
+        render_field<in_popup>(64,  path_to_log,    "LOG PATH:",       "##LogPath", ImGuiInputTextFlags_None, &highlight[1], x_ali);
+        render_field<in_popup>(256, path_to_output, "WORKSPACE PATH:", "##OutPath", ImGuiInputTextFlags_None, &highlight[2], x_ali);
         ImGui::PopStyleColor();
 
-        static logging::LEVEL level_ = logging::LEVEL::INFO;
+        // Workspace browse button
+        if constexpr (!in_popup) { ImGui::SetCursorPosX(x_ali); }
+        if (ImGui::Button("Browse Workspace Folder...##WorkspaceBrowse")) {
+            std::string selected_dir = FileManager::SelectFolderDialog();
+            if (!selected_dir.empty()) {
+                strncpy(path_to_output, selected_dir.c_str(), sizeof(path_to_output) - 1);
+            }
+        }
+
+        static spdlog::level::level_enum level_ = spdlog::level::info;
         
         ImGui::PushFont(io.Fonts->Fonts[0]);
         if constexpr (!in_popup) {ImGui::SetCursorPosX(x_ali);}
@@ -553,28 +614,28 @@ namespace restfulEz {
         if (ImGui::BeginTable("Logging Level", 5, ImGuiTableFlags_NoSavedSettings, ImVec2(context_width, 0.0f), context_width)) {
 
             ImGui::TableNextColumn();
-            if (ImGui::Selectable("DEBUG",    level_ == logging::LEVEL::DEBUG)) {
-                level_ = logging::LEVEL::DEBUG;
+            if (ImGui::Selectable("DEBUG",    level_ == spdlog::level::debug)) {
+                level_ = spdlog::level::debug;
             };
 
             ImGui::TableNextColumn();
-            if (ImGui::Selectable("INFO",     level_ == logging::LEVEL::INFO)) {
-                level_ = logging::LEVEL::INFO;
+            if (ImGui::Selectable("INFO",     level_ == spdlog::level::info)) {
+                level_ = spdlog::level::info;
             };
 
             ImGui::TableNextColumn();
-            if (ImGui::Selectable("WARNING",  level_ == logging::LEVEL::WARNING)) {
-                level_ = logging::LEVEL::WARNING;
+            if (ImGui::Selectable("WARNING",  level_ == spdlog::level::warn)) {
+                level_ = spdlog::level::warn;
             }; 
 
             ImGui::TableNextColumn();
-            if (ImGui::Selectable("ERRORS",   level_ == logging::LEVEL::ERRORS)) {
-                level_ = logging::LEVEL::ERRORS;
+            if (ImGui::Selectable("ERRORS",   level_ == spdlog::level::err)) {
+                level_ = spdlog::level::err;
             }; 
 
             ImGui::TableNextColumn();
-            if (ImGui::Selectable("CRITICAL", level_ == logging::LEVEL::CRITICAL)) {
-                level_ = logging::LEVEL::CRITICAL;
+            if (ImGui::Selectable("CRITICAL", level_ == spdlog::level::critical)) {
+                level_ = spdlog::level::critical;
             }; 
 
             ImGui::EndTable();
@@ -585,18 +646,30 @@ namespace restfulEz {
         ImGui::PushFont(io.Fonts->Fonts[0]);
         if (ImGui::Button("Submit")) { 
             this->_path_to_output = path_to_output;
-            write_config_file(api_key, path_to_log, path_to_output, verbosity, level_);
-            this->_underlying_client = std::make_shared<client::RiotApiClient>(CONFIG_FILE_PATH, path_to_log, level_, verbosity);
-            this->request_sender->set_client(this->_underlying_client);
+            auto& fm = FileManager::GetInstance();
+            fm.SetApiKey(api_key);
+            fm.SetWorkspace(path_to_output);
+            fm.GetConfig().log_path = path_to_log;
+            fm.GetConfig().log_level = level_;
+            fm.GetConfig().verbosity = verbosity;
+            fm.SaveConfig(CONFIG_FILE_PATH);
+
+            if (this->_underlying_client) {
+                this->_underlying_client->update_api_key(api_key);
+            } else {
+                this->_underlying_client = std::make_shared<client::RiotApiClient>(api_key, std::string(path_to_log), level_, verbosity, true);
+                this->request_sender->set_client(this->_underlying_client);
+            }
             this->request_sender->set_output_directory(this->_path_to_output);
             this->batch_group->set_sender(this->request_sender);
-            this->_path_to_output = path_to_output;
+
+            DatabaseManager::GetInstance().Init(fm.GetWorkspacePaths().db_file.string());
             submit = true;
         }
         ImGui::PopFont();
         return submit;
-
     }
+
 
     bool RestfulEzreal::configure_new_client(bool allow_close) {
 
@@ -701,80 +774,21 @@ namespace restfulEz {
     using Document = simdjson::ondemand::document;
 
     void RestfulEzreal::instantiate_client(int* int_out, int* parse_out, const std::string& file_path) {
-
-        Parser parser;
-        Document doc;
-        std::string contents;
-        try {
-            std::ifstream config(file_path);
-            if (!config.is_open()) {
-                throw std::runtime_error("Invalid file path given, exiting config...");
-            }
-            std::stringstream intermediate; intermediate << config.rdbuf();
-            config.close();
-            contents = intermediate.str();
-            contents.insert(contents.end(), simdjson::SIMDJSON_PADDING, '\0');
-            doc = parser.iterate(contents.data(), strlen(contents.data()), sizeof(contents.data()));
-            *parse_out = 1; // success
-        }
-        catch (simdjson::simdjson_error& ex) {
-            std::cerr << "Invalid Json Format, exiting config..." << std::endl;
+        bool ok = FileManager::GetInstance().LoadConfig(file_path.empty() ? CONFIG_FILE_PATH : file_path);
+        if (!ok) {
             *parse_out = 2;
             *int_out = 2;
             return;
         }
-        catch (std::runtime_error& ex) {
-            std::cerr << ex.what() << std::endl;
-            *parse_out = 2;
-            *int_out = 2;
-            return;
-        }
-        // can probably template
-        std::string log_path;
-        try {
-            log_path = doc["log-path"].get_string().value();
-        }
-        catch (simdjson::simdjson_error& ex) {
-            std::cerr << "Log path not given, defaulting to logs.log in binary directory" << std::endl;
-            log_path = "logs.log";
-        }
+        *parse_out = 1;
+        *int_out = 1;
 
-        logging::LEVEL loglevel;
-        try {
-            loglevel = static_cast<logging::LEVEL>(doc["log-level"].get_int64().value());
-        }
-        catch (simdjson::simdjson_error& ex) {
-            std::cerr << "Log Level not given, defaulting to INFO" << std::endl;
-            loglevel = logging::LEVEL::INFO;
-        }
-        bool verbosity;
-        try {
-            verbosity = doc["verbosity"].get_bool().value();
-        }
-        catch (simdjson::simdjson_error& ex) {
-            std::cerr << "Log verbosity not given, defaulting to false" << std::endl;
-            verbosity = false;
-        }
-        
-        try {
-            this->_path_to_output = doc["output-path"].get_string().value();
-        }
-        catch (simdjson::simdjson_error& ex) {
-            std::cerr << "Output path not given, defaulting to \".\\output\\\" in binary dir" << std::endl;
-            this->_path_to_output = "./output/";
-        }
-
-        try {
-            doc["api-key"];
-            *int_out = 1;
-        } 
-        catch (simdjson::simdjson_error& ex) {
-            *int_out = 2;
-        }
-
-        this->_underlying_client = std::make_shared<client::RiotApiClient>(file_path, log_path, loglevel, verbosity);
+        const auto& cfg = FileManager::GetInstance().GetConfig();
+        this->_path_to_output = cfg.active_workspace_path;
+        this->_underlying_client = std::make_shared<client::RiotApiClient>(cfg.api_key, cfg.log_path, cfg.log_level, cfg.verbosity, true);
         this->request_sender->set_client(this->_underlying_client);
         this->request_sender->set_output_directory(this->_path_to_output);
+        DatabaseManager::GetInstance().Init(FileManager::GetInstance().GetWorkspacePaths().db_file.string());
     }
 
     bool RestfulEzreal::start_up_from_existing(int* ret) {
@@ -835,32 +849,6 @@ namespace restfulEz {
         return finished;
     }
 
-    static void re_write_config(const char* new_key) {
-
-        std::ifstream default_config(CONFIG_FILE_PATH);
-        std::ofstream    temp_config("./tempEzrealRunes.json");
-
-        if (!default_config.is_open()) {
-            throw std::runtime_error("No Configuration File");
-        }
-
-        temp_config << "{\n\t\"api-key\" : \"" << new_key << "\"\n,";
-
-        std::string lne;
-        int counter = 0;
-        while (getline(default_config, lne)) {
-            if (counter > 1) {
-                temp_config << lne << "\n";
-            }
-            counter++;
-        }
-        default_config.close();
-        temp_config.close();
-
-        remove(CONFIG_FILE_PATH);
-        rename("./tempEzrealRunes.json", CONFIG_FILE_PATH);
-    }
-
     bool RestfulEzreal::start_up_default(int* ret) {
 
         static const float title_size = re_utils::text_size(1, "RESTfulEzreal;");
@@ -911,15 +899,16 @@ namespace restfulEz {
         } else {
             ImGui::SetCursorPosX(end_ofline - ImGui::CalcTextSize("add key").x);
             if (ImGui::Button("add key")) {
-                re_write_config(api_key);
+                FileManager::GetInstance().SetApiKey(api_key);
+                FileManager::GetInstance().SaveConfig(CONFIG_FILE_PATH);
                 this->custom_config_path = CONFIG_FILE_PATH;
                 *ret = 2;
             }
         }
-
 
         ImGui::End();
 
         return true;
     }
 }
+

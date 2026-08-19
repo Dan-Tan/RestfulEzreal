@@ -1,12 +1,12 @@
 [submodule "riot-cpp"]
-	path = riot-cpp
+	path = third_party/riot-cpp
 	url = git@github.com:Dan-Tan/riot-cpp.git
 [submodule "glfw"]
-	path = glfw
+	path = third_party/glfw
 	url = https://github.com/glfw/glfw.git
 [submodule "imgui"]
-	path = imgui
+	path = third_party/imgui
 	url = https://github.com/ocornut/imgui.git
 [submodule "nativefiledialog-extended"]
-	path = nativefiledialog-extended
+	path = third_party/nativefiledialog-extended
 	url = https://github.com/btzy/nativefiledialog-extended.git

@@ -155,13 +155,13 @@ namespace restfulEz {
                         case MASTER:
                             response = this->underlying_client->Tft_League.master(params.at(0));break;
                         case L_BY_SUMMONER_ID:
-                            response = this->underlying_client->Tft_League.by_summoner_id(params.at(0), params.at(1));break;
+                            response = this->underlying_client->Tft_League.by_puuid(params.at(0), params.at(1));break;
                         case L_BY_LEAGUE_ID:
                             response = this->underlying_client->Tft_League.by_league_id(params.at(0), params.at(1));break;
                         case QUEUE_TOP:
-                            response = this->underlying_client->Tft_League.queue_top(params.at(0), params.at(1));break;
+                            response = this->underlying_client->Tft_League.top_by_queue(params.at(0), params.at(1));break;
                         case L_BY_TIER_DIVISION:
-                            response = this->underlying_client->Tft_League.by_tier_division(params.at(0), params.at(1), params.at(2), std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))));break;
+                            response = this->underlying_client->Tft_League.entries(params.at(0), params.at(1), params.at(2), std::vector<std::pair<std::string, std::string>>{std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0))});break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method Index Given for Tft_League");
                     } break;
@@ -169,26 +169,24 @@ namespace restfulEz {
                     switch (endpoint_method) {
                         case M_BY_PUUID:
                             response = this->underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), 
-                                    std::pair<std::string, int>(opt_names.at(0), atoi(opt_inputs.at(0))),
-                                    std::pair<std::string, int>(opt_names.at(1), atoi(opt_inputs.at(1))),
-                                    std::pair<std::string, int>(opt_names.at(2), atoi(opt_inputs.at(2))),
-                                    std::pair<std::string, int>(opt_names.at(3), atoi(opt_inputs.at(3)))
+                                    std::vector<std::pair<std::string, std::string>>{
+                                        std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)),
+                                        std::pair<std::string, std::string>(opt_names.at(1), opt_inputs.at(1)),
+                                        std::pair<std::string, std::string>(opt_names.at(2), opt_inputs.at(2)),
+                                        std::pair<std::string, std::string>(opt_names.at(3), opt_inputs.at(3))
+                                    }
                                         );break;
                         case M_BY_MATCH_ID:
-                            response = this->underlying_client->Tft_Match.by_match(params.at(0), params.at(1));break;
+                            response = this->underlying_client->Tft_Match.by_match_id(params.at(0), params.at(1));break;
                     } break;
                 case STATUS:
-                    response = this->underlying_client->Tft_Status.v1(params.at(0));break;
+                    response = this->underlying_client->Tft_Status.status(params.at(0));break;
                 case SUMMONER:
                     switch (endpoint_method) {
-                        case S_BY_ACCOUNT_ID:
-                            response = this->underlying_client->Tft_Summoner.by_account(params.at(0), params.at(1));break;
-                        case S_BY_NAME:
-                            response = this->underlying_client->Tft_Summoner.by_name(params.at(0), params.at(1));break;
                         case S_BY_PUUID:
                             response = this->underlying_client->Tft_Summoner.by_puuid(params.at(0), params.at(1));break;
-                        case S_BY_SUMMONER_ID:
-                            response = this->underlying_client->Tft_Summoner.by_summoner_id(params.at(0), params.at(1));break;
+                        default:
+                            throw std::invalid_argument("Endpoint method deprecated in Riot API (use Account-v1 / by_puuid)");
                     } break;
                 default:
                     throw std::invalid_argument("Invaid Endpoint Index given");

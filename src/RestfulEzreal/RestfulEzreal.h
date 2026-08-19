@@ -1,9 +1,13 @@
 #pragma once
 #include "client/client.h"
+#include <spdlog/spdlog.h>
 #include "json/json.h"
 #include "RequestQueue.h"
 #include "QueryForm.h"
 #include "simdjson.h"
+#include "db/DatabaseManager.h"
+
+namespace client = riotcpp::client;
 #include <fstream>
 #include <vector>
 #include <array>
@@ -47,6 +51,7 @@ namespace restfulEz {
             RestfulEzreal(current_page* on_display);
             ~RestfulEzreal() {
                 this->request_sender->stop();
+                DatabaseManager::GetInstance().Close();
             }
 
             void OnUIRender();

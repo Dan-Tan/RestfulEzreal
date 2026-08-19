@@ -104,22 +104,22 @@ namespace restfulEz {
 
         switch (endpoint) {
             case CONTENT:
-                response = this->underlying_client->Val_Content.content(params.at(0), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
+                response = this->underlying_client->Val_Content.contents(params.at(0), std::vector<std::pair<std::string, std::string>>{std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0))});break;
             case MATCH:
                 switch (endpoint_method) {
                     case BY_MATCH:
-                        response = this->underlying_client->Val_Match.by_match(params.at(0), params.at(1));break;
+                        response = this->underlying_client->Val_Match.by_match_id(params.at(0), params.at(1));break;
                     case BY_PUUID:
                         response = this->underlying_client->Val_Match.by_puuid(params.at(0), params.at(1));break;
                     case BY_QUEUE:
-                        response = this->underlying_client->Val_Match.by_queue(params.at(0), params.at(1));break;
+                        response = this->underlying_client->Val_Match.recent_by_queue(params.at(0), params.at(1));break;
                     default:
                         throw std::invalid_argument("Invalid Endpoint Method Index Given");
                 } break;
             case RANKED:
-                response = this->underlying_client->Val_Ranked.by_act(params.at(0), params.at(1), std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)));break;
+                response = this->underlying_client->Val_Ranked.leaderboards_by_act(params.at(0), params.at(1), std::vector<std::pair<std::string, std::string>>{std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0))});break;
             case STATUS:
-                response = this->underlying_client->Val_Status.platform_data(params.at(0));break;
+                response = this->underlying_client->Val_Status.status(params.at(0));break;
             default:
                 throw std::invalid_argument("Invalid Endpoint Index Given");
         }

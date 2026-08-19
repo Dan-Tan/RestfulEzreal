@@ -15,6 +15,7 @@
 #include "src/RestfulEzreal/RestfulEzreal.h"
 #include <stdio.h>          // printf, fprintf
 #include <stdlib.h>         // abort
+#include <filesystem>
 #define GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -497,10 +498,25 @@ int main(int, char**)
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != nullptr);
     io.Fonts->AddFontDefault();
-    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Light.ttf",  75.0f);
-    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Light.ttf",  20.0f);
-    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Medium.ttf", 15.0f);
-    io.Fonts->AddFontFromFileTTF("../fonts/Inconsolata-Medium.ttf", 10.0f);
+    std::string font_light = std::filesystem::exists("./fonts/Inconsolata-Light.ttf") ? "./fonts/Inconsolata-Light.ttf" : 
+                            (std::filesystem::exists("../fonts/Inconsolata-Light.ttf") ? "../fonts/Inconsolata-Light.ttf" : "");
+    std::string font_med = std::filesystem::exists("./fonts/Inconsolata-Medium.ttf") ? "./fonts/Inconsolata-Medium.ttf" : 
+                          (std::filesystem::exists("../fonts/Inconsolata-Medium.ttf") ? "../fonts/Inconsolata-Medium.ttf" : "");
+
+    if (!font_light.empty()) {
+        io.Fonts->AddFontFromFileTTF(font_light.c_str(),  75.0f);
+        io.Fonts->AddFontFromFileTTF(font_light.c_str(),  20.0f);
+    } else {
+        io.Fonts->AddFontDefault();
+        io.Fonts->AddFontDefault();
+    }
+    if (!font_med.empty()) {
+        io.Fonts->AddFontFromFileTTF(font_med.c_str(), 15.0f);
+        io.Fonts->AddFontFromFileTTF(font_med.c_str(), 10.0f);
+    } else {
+        io.Fonts->AddFontDefault();
+        io.Fonts->AddFontDefault();
+    }
     io.Fonts->Build();
 
     // Upload Fonts
