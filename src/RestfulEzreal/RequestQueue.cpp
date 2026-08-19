@@ -327,24 +327,24 @@ namespace restfulEz {
     }
 
     void RequestSender::Send_Batch_Request(std::shared_ptr<BatchRequest> batch) {
+        if (!batch) return;
 
-        // assume all tasks in the linked are ready to execute
-        bool not_finished = true;
-        json_ptr result;
-
-        request next = batch->get_next();
-        while (!next.same_endpoint(BatchRequest::FINISHED)) {
-            D("Sending Request (game: " << next._game << ",endpoint: " << next._endpoint << ", method: " << next._endpoint_method << ")");
-            result = this->Send_Request(next);
-            while (batch->insert_result(std::move(result))) {
-                next = batch->get_current();
-                result = this->Send_Request(next);
+        try {
+            request next = batch->get_next();
+            while (!next.same_endpoint(BatchRequest::FINISHED)) {
+                json_ptr result = this->Send_Request(next);
+                while (batch->insert_result(std::move(result))) {
+                    next = batch->get_current();
+                    if (next.same_endpoint(BatchRequest::FINISHED)) break;
+                    result = this->Send_Request(next);
+                }
+                next = batch->get_next();
             }
-            next = batch->get_next();
+        } catch (const std::exception& ex) {
+            std::cerr << "[RequestSender] Exception in Send_Batch_Request: " << ex.what() << std::endl;
         }
-
-        D("Batch Request finished executing");
     }
+
 
     void RequestSender::test_regions() {
         /*

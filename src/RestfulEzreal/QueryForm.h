@@ -809,7 +809,7 @@ namespace restfulEz {
         for (auto& parent : this->parents) {
             // a child is iterative if any of its parents are (this will also calculate parent checks to prevent recomputation)
             if (parent) {
-                this->req_iterative = parent->check_iterative();
+                this->req_iterative |= parent->check_iterative();
             }
         }
         return this->req_iterative;

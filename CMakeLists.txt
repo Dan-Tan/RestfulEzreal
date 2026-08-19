@@ -134,5 +134,9 @@ add_executable(test_file_manager tests/test_file_manager.cpp)
 target_include_directories(test_file_manager PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
 target_link_libraries(test_file_manager PRIVATE RestfulEzreal)
 
+add_executable(test_batch tests/test_batch.cpp)
+target_include_directories(test_batch PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_batch PRIVATE RestfulEzreal)
+
 
 

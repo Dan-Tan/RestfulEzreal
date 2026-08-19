@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <queue>
+#include <deque>
 
 #define P_NAME_LENGTH 32
 #define KEY_LENGTH 64
@@ -23,7 +24,7 @@ namespace restfulEz {
         P_NAME(const char* str) {
             strncpy(name, str, P_NAME_LENGTH);
         };
-    }P_NAME;
+    } P_NAME;
     
     // container for inputs params
     typedef struct PARAM_CONT {
@@ -34,14 +35,13 @@ namespace restfulEz {
         PARAM_CONT(const char* str) {
             strncpy(param, str, P_INPUT_LENGTH);
         };
-        void  operator=(const char* str) {
+        void operator=(const char* str) {
             strncpy(param, str, P_INPUT_LENGTH);
         }
-    }PARAM_CONT;
+    } PARAM_CONT;
     
     // container for json keys
     typedef struct KEY_CONT {
-
         char key[KEY_LENGTH] = { 0 };
 
         operator char*() {return key;};
@@ -107,8 +107,6 @@ namespace restfulEz {
     } iter_access_info;
 
 
-
-
     // LINK BETWEEN REQUESTS
     
     typedef struct base_link {
@@ -121,7 +119,7 @@ namespace restfulEz {
     } base_link;
     
     // describes the relationship between parent and child request (owned by child)
-    typedef struct request_link : public base_link{
+    typedef struct request_link : public base_link {
         std::vector<json_access_info> link_info;
         bool get_dependencies(std::vector<PARAM_CONT>& to_fill) override;
         bool get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fill) override;
@@ -133,7 +131,6 @@ namespace restfulEz {
         bool get_dependencies(std::vector<std::vector<PARAM_CONT>>& to_fills) override;
         bool get_dependencies(std::vector<PARAM_CONT>& to_fill) override {throw std::logic_error("Should not be called from iter_request link");};
     } iter_request_link;
-
 
 
     // TOP LEVEL INDIVIDUAL LINKED REQUEST STRUCTURE 
@@ -156,7 +153,7 @@ namespace restfulEz {
 
     typedef struct IterativeRequest : LinkedRequest {
         std::vector<iter_request_link> iter_dependencies;
-        std::vector<std::vector<PARAM_CONT>>  param_fields;
+        std::vector<std::vector<PARAM_CONT>> param_fields;
         std::vector<std::size_t> param_indices;
         
         // response false when the Iterative request has been completed
@@ -168,65 +165,56 @@ namespace restfulEz {
     } IterativeRequest;
 
 
-    typedef union ReqNode {
-        std::unique_ptr<LinkedRequest> unsent_request;
+    struct ReqNode {
+        std::unique_ptr<LinkedRequest> unsent_request = nullptr;
         std::vector<json_ptr> request_results;
-        ReqNode(std::unique_ptr<LinkedRequest> unsent) : unsent_request(std::move(unsent)) {};
-        ReqNode() : request_results() {};
-        ~ReqNode() {};
-    } ReqNode;
+        ReqNode(std::unique_ptr<LinkedRequest> unsent) : unsent_request(std::move(unsent)), request_results() {}
+        ReqNode() : unsent_request(nullptr), request_results() {}
+        ~ReqNode() = default;
+    };
     
     // A node in the Batch request tree representing both an unsent or sent request;
     typedef struct RequestNode {
         bool sent = false;
         std::unique_ptr<ReqNode> _node;
-        RequestNode(std::unique_ptr<LinkedRequest> unsent) : _node(std::make_unique<ReqNode>(std::move(unsent))) {};
+        RequestNode(std::unique_ptr<LinkedRequest> unsent) : _node(std::make_unique<ReqNode>(std::move(unsent))) {}
 
         std::unique_ptr<LinkedRequest> send_request();
-        ~RequestNode() {
-            // manually deallocate if the request was never sent
-            if (!this->sent) {
-                this->_node->unsent_request.reset();
-            } else {
-                this->_node->request_results.clear();
-            }
-        }
+        ~RequestNode() = default;
     } RequestNode;
 
 
-    // LINKED LIST REQUEST STRUCTURE FOR REQUEST EXECUTION  
-    
-    typedef struct ListNode {
-        std::shared_ptr<ListNode> previous = nullptr;
-        std::shared_ptr<RequestNode> node = nullptr;
-        std::shared_ptr<ListNode> next = nullptr;
-    } ListNode;
+    // CONTAINER STRUCTURE FOR REQUEST EXECUTION  
 
     class CLinkedList {
         private:
-            std::shared_ptr<ListNode> beginning = nullptr;
-            std::shared_ptr<ListNode> current_position = nullptr;
-            std::shared_ptr<ListNode> end = nullptr;
-
-            std::size_t length = 0;
+            std::deque<std::shared_ptr<RequestNode>> queue_;
+            std::shared_ptr<RequestNode> current_ = nullptr;
          
         public:
             CLinkedList() = default;
             ~CLinkedList() = default;
-            void insert(std::shared_ptr<RequestNode> to_insert);
-            void remove();
-            inline bool finished() {return this->length == 0;};
-            std::shared_ptr<RequestNode> get_next();
+            void insert(std::shared_ptr<RequestNode> to_insert) {
+                if (to_insert) queue_.push_back(to_insert);
+            }
+            void remove() {
+                if (!queue_.empty()) queue_.pop_front();
+                current_ = nullptr;
+            }
+            inline bool finished() const { return queue_.empty(); }
+            std::shared_ptr<RequestNode> get_next() {
+                if (queue_.empty()) return nullptr;
+                current_ = queue_.front();
+                return current_;
+            }
 
-            std::size_t size() const {return this->length;};
+            std::size_t size() const { return queue_.size(); }
     };
 
     // CLASS ENCODING ALL REQUESTS THAT MAKE UP A BATCH
 
     class BatchRequest {
-
         private:
-            // only the Batch Request should have access to requests
             std::unique_ptr<CLinkedList> parent_requests = std::make_unique<CLinkedList>(); 
             std::shared_ptr<RequestNode> current_results = nullptr;
             std::unique_ptr<LinkedRequest> current_request = nullptr;
@@ -244,6 +232,5 @@ namespace restfulEz {
 
         private:
             bool reformat_parents();
-
     };
 }
