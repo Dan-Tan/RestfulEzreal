@@ -63,7 +63,7 @@ void FileManager::SanitizeConfig() {
 }
 
 std::string FileManager::ResolveConfigPath(const std::string& preferred_path) const {
-    if (!preferred_path.empty() && fs::exists(preferred_path)) {
+    if (!preferred_path.empty()) {
         return preferred_path;
     }
 
@@ -90,8 +90,9 @@ std::string FileManager::ResolveConfigPath(const std::string& preferred_path) co
         }
     }
 
-    return preferred_path.empty() ? "./EzrealRunes.json" : preferred_path;
+    return "./EzrealRunes.json";
 }
+
 
 void FileManager::UpdateWorkspacePaths() {
     try {

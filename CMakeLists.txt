@@ -10,9 +10,12 @@ add_subdirectory(third_party/riot-cpp)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("Debug Build")
+    add_compile_definitions(DEBUG_MODE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
 else()
     message("Non-Debug Build")
 endif()
+
 
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DVK_PROTOTYPES")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_PROTOTYPES")
@@ -89,14 +92,6 @@ target_link_libraries(RestfulEzreal PUBLIC ${LIBRARIES})
 target_compile_definitions(RestfulEzreal PUBLIC -DImTextureID=ImU64)
 
 target_compile_definitions(RestfulEzreal PRIVATE $<$<CONFIG:Debug>:DEBUG_MODE>)
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
-    target_link_options(RestfulEzreal PRIVATE -fsanitize=address -static-libasan)
-else()
-endif()
-
-
-
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(JSONCPP REQUIRED jsoncpp)
@@ -111,15 +106,7 @@ target_include_directories(RestfulEzreal PUBLIC ./src/RestfulEzreal/db)
 target_link_libraries(RestfulEzreal PUBLIC riot-cpp ${JSONCPP_LIBRARIES} ${CMAKE_CURRENT_SOURCE_DIR}/third_party/duckdb/lib/libduckdb.so)
 
 add_executable(Restful-Ezreal main.cpp)
-
 target_compile_definitions(Restful-Ezreal PRIVATE $<$<CONFIG:Debug>:DEBUG_MODE>)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
-    target_link_options(Restful-Ezreal PRIVATE -fsanitize=address -static-libasan)
-else()
-endif()
-
 target_include_directories(Restful-Ezreal PRIVATE ./third_party/riot-cpp/src/riot-cpp)
 target_include_directories(Restful-Ezreal PRIVATE ./third_party/imgui)
 target_include_directories(Restful-Ezreal PRIVATE ./third_party/glfw)
@@ -137,6 +124,7 @@ target_link_libraries(test_file_manager PRIVATE RestfulEzreal)
 add_executable(test_batch tests/test_batch.cpp)
 target_include_directories(test_batch PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
 target_link_libraries(test_batch PRIVATE RestfulEzreal)
+
 
 
 

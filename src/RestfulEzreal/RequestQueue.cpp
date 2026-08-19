@@ -173,16 +173,20 @@ namespace restfulEz {
             return nullptr;
         }
 
-        try {
-            this->recent_request = std::string(GAMES_[task._game]) + " | " + std::string(GAME_ENDPOINTS_[task._game][task._endpoint]) + " | " + std::string(ENDPOINT_METHODS_[task._game][task._endpoint][task._endpoint_method]);
-        } catch (...) {
-            this->recent_request = "Unknown Request";
+        {
+            std::lock_guard<std::mutex> lock(this->recent_mutex);
+            try {
+                this->recent_request = std::string(GAMES_[task._game]) + " | " + std::string(GAME_ENDPOINTS_[task._game][task._endpoint]) + " | " + std::string(ENDPOINT_METHODS_[task._game][task._endpoint][task._endpoint_method]);
+            } catch (...) {
+                this->recent_request = "Unknown Request";
+            }
+
+            this->recent_params.clear();
+            for (PARAM_CONT& param : task.params) {
+                this->recent_params.emplace_back(param.param);
+            }
         }
 
-        this->recent_params.clear();
-        for (PARAM_CONT& param : task.params) {
-            this->recent_params.emplace_back(param.param);
-        }
 
         json_ptr response = nullptr;
         try {
@@ -329,21 +333,26 @@ namespace restfulEz {
     void RequestSender::Send_Batch_Request(std::shared_ptr<BatchRequest> batch) {
         if (!batch) return;
 
+        std::cout << "[RequestSender] Send_Batch_Request: Starting pipeline execution..." << std::endl;
         try {
             request next = batch->get_next();
             while (!next.same_endpoint(BatchRequest::FINISHED)) {
+                std::cout << "[RequestSender] Send_Batch_Request: Dispatching query game=" << next._game << " endpoint=" << next._endpoint << " method=" << next._endpoint_method << std::endl;
                 json_ptr result = this->Send_Request(next);
                 while (batch->insert_result(std::move(result))) {
                     next = batch->get_current();
                     if (next.same_endpoint(BatchRequest::FINISHED)) break;
+                    std::cout << "[RequestSender] Send_Batch_Request: Dispatching iterative query game=" << next._game << " endpoint=" << next._endpoint << " method=" << next._endpoint_method << std::endl;
                     result = this->Send_Request(next);
                 }
                 next = batch->get_next();
             }
+            std::cout << "[RequestSender] Send_Batch_Request: Pipeline completed successfully." << std::endl;
         } catch (const std::exception& ex) {
             std::cerr << "[RequestSender] Exception in Send_Batch_Request: " << ex.what() << std::endl;
         }
     }
+
 
 
     void RequestSender::test_regions() {

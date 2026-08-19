@@ -30,13 +30,22 @@ namespace restfulEz {
     typedef struct PARAM_CONT {
         char param[P_INPUT_LENGTH] = { 0 };
         operator char*() { return param; };
-        operator std::string() { return std::string(param); };
-        PARAM_CONT() {};
+        operator const char*() const { return param; };
+        operator std::string() const { return std::string(param); };
+        PARAM_CONT() { param[0] = '\0'; };
         PARAM_CONT(const char* str) {
-            strncpy(param, str, P_INPUT_LENGTH);
+            if (str) {
+                strncpy(param, str, P_INPUT_LENGTH - 1);
+                param[P_INPUT_LENGTH - 1] = '\0';
+            }
         };
         void operator=(const char* str) {
-            strncpy(param, str, P_INPUT_LENGTH);
+            if (str) {
+                strncpy(param, str, P_INPUT_LENGTH - 1);
+                param[P_INPUT_LENGTH - 1] = '\0';
+            } else {
+                param[0] = '\0';
+            }
         }
     } PARAM_CONT;
     
@@ -45,16 +54,26 @@ namespace restfulEz {
         char key[KEY_LENGTH] = { 0 };
 
         operator char*() {return key;};
-        operator std::string() {return std::string(key);};
-        KEY_CONT() {};
+        operator const char*() const {return key;};
+        operator std::string() const {return std::string(key);};
+        KEY_CONT() { key[0] = '\0'; };
         KEY_CONT(const char* str) {
-            strncpy(key, str, KEY_LENGTH);
+            if (str) {
+                strncpy(key, str, KEY_LENGTH - 1);
+                key[KEY_LENGTH - 1] = '\0';
+            }
         };
 
         void operator=(const char* str) {
-            strncpy(key, str, KEY_LENGTH);
+            if (str) {
+                strncpy(key, str, KEY_LENGTH - 1);
+                key[KEY_LENGTH - 1] = '\0';
+            } else {
+                key[0] = '\0';
+            }
         };
     } KEY_CONT;
+
 
     
     // MOST PRIMITIVE REQUEST STRUCT, ENOUGH INFORMATION TO SEND A SINGLE REQUEST

@@ -69,8 +69,16 @@ namespace restfulEz {
             int region_test_display();
             void test_regions();
 
+            std::pair<std::string, std::vector<std::string>> get_recent_request_info() {
+                std::lock_guard<std::mutex> lock(recent_mutex);
+                return { recent_request, recent_params };
+            }
+
+        private:
+            std::mutex recent_mutex;
             std::string recent_request = "No Requests Sent.";
             std::vector<std::string> recent_params = {};
+
 
         private: // methods
             void worker();

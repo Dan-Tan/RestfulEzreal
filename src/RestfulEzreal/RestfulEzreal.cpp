@@ -306,12 +306,13 @@ namespace restfulEz {
     }
 
     static void render_recent_request(const std::string& req_name, const std::vector<std::string>& param_descriptions) {
-        ImGui::Text("Most Recent Request");
-        ImGui::Text(req_name.data()); // null terminated
+        ImGui::TextUnformatted("Most Recent Request");
+        ImGui::TextUnformatted(req_name.c_str());
         for (const std::string& param_desc : param_descriptions) {
-            ImGui::Text(param_desc.data());
+            ImGui::TextUnformatted(param_desc.c_str());
         }
     }
+
 
     void RestfulEzreal::render_client_status() {
 
@@ -380,7 +381,9 @@ namespace restfulEz {
         std::string ws_path = FileManager::GetInstance().GetWorkspacePaths().root_dir.string();
         ImGui::Text("Workspace: %s", ws_path.c_str());
 
-        render_recent_request(this->request_sender->recent_request, this->request_sender->recent_params);
+        auto [recent_req_name, recent_req_params] = this->request_sender->get_recent_request_info();
+        render_recent_request(recent_req_name, recent_req_params);
+
 
         ImGui::Separator();
         ImGui::Text("Database (DuckDB):");

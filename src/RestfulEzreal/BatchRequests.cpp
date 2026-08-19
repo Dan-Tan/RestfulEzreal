@@ -353,12 +353,18 @@ namespace restfulEz {
                     if (child->_node->unsent_request->ready()) {
                         try {
                             if (child->_node->unsent_request->fill_request()) {
-                                child->_node->unsent_request->update_base();
-                                this->parent_requests->insert(child);
+                                bool can_insert = true;
+                                if (dynamic_cast<IterativeRequest*>(child->_node->unsent_request.get())) {
+                                    can_insert = child->_node->unsent_request->update_base();
+                                }
+                                if (can_insert) {
+                                    this->parent_requests->insert(child);
+                                }
                             }
                         } catch (const std::exception& err) {
                             std::cerr << "[BatchRequest] Error preparing child: " << err.what() << std::endl;
                         }
+
                     }
                 }
             }
