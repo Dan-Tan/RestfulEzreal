@@ -437,12 +437,19 @@ bool DatabaseManager::SaveMatch(const std::string& match_id, const std::string& 
         int assists{0};
         bool win{false};
     };
+    std::string actual_match_id = match_id;
     std::vector<ParticipantRow> participants;
 
     try {
+        simdjson::padded_string padded(raw_json_str.data(), raw_json_str.size());
         simdjson::dom::parser parser;
         simdjson::dom::element doc;
-        if (parser.parse(raw_json_str.data(), raw_json_str.size()).get(doc) == simdjson::SUCCESS) {
+        if (parser.parse(padded).get(doc) == simdjson::SUCCESS) {
+            std::string_view mid_sv;
+            if (doc["metadata"]["matchId"].get(mid_sv) == simdjson::SUCCESS && !mid_sv.empty()) {
+                actual_match_id = std::string(mid_sv);
+            }
+
             simdjson::dom::element info = doc["info"];
 
             int64_t val_int = 0;
@@ -521,7 +528,7 @@ bool DatabaseManager::SaveMatch(const std::string& match_id, const std::string& 
         return false;
     }
 
-    duckdb_bind_varchar(stmt, 1, match_id.c_str());
+    duckdb_bind_varchar(stmt, 1, actual_match_id.c_str());
     duckdb_bind_int64(stmt, 2, game_creation);
     duckdb_bind_int64(stmt, 3, game_duration);
     duckdb_bind_varchar(stmt, 4, game_version.c_str());
@@ -548,7 +555,7 @@ bool DatabaseManager::SaveMatch(const std::string& match_id, const std::string& 
             (match_id, participant_id, player_id, game_name, tag_line, champion_name, champion_id, team_id, kills, deaths, assists, win)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
         )", &pstmt) != DuckDBError) {
-            duckdb_bind_varchar(pstmt, 1, match_id.c_str());
+            duckdb_bind_varchar(pstmt, 1, actual_match_id.c_str());
             duckdb_bind_int32(pstmt, 2, p.participant_id);
             duckdb_bind_varchar(pstmt, 3, p_player_id.c_str());
             duckdb_bind_varchar(pstmt, 4, p.game_name.c_str());

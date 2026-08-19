@@ -256,6 +256,8 @@ namespace restfulEz {
         std::string identifier = "";
         if (game == 0 && task.params.size() >= 3) {
             identifier = std::string(task.params[1].param) + "_" + std::string(task.params[2].param);
+        } else if (task.params.size() >= 2) {
+            identifier = task.params[1].param;
         } else if (task.params.size() > 0) {
             identifier = task.params[0].param;
         }
@@ -309,8 +311,8 @@ namespace restfulEz {
             }
             // League Match-v5 (Game: 1, Endpoint: 6, Method: 0 [Match] or 1 [Timeline])
             else if (game == 1 && endpoint == 6) {
-                if (task.params.size() > 0) {
-                    std::string match_id = task.params[0].param;
+                if (task.params.size() >= 2) {
+                    std::string match_id = task.params[1].param;
                     std::string raw_str(result.data(), valid_len);
                     if (endpoint_method == 0) {
                         DatabaseManager::GetInstance().SaveMatch(match_id, raw_str);

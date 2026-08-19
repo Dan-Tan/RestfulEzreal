@@ -136,12 +136,21 @@ namespace restfulEz {
 
     using json_ptr = std::unique_ptr<std::vector<char>>;
 
+    static std::vector<std::pair<std::string, std::string>> build_optional_params(const request& task) {
+        std::vector<std::pair<std::string, std::string>> opts;
+        for (size_t i = 0; i < task.optional_names.size() && i < task.optional_inputs.size(); ++i) {
+            std::string name = task.optional_names[i].name;
+            if (!name.empty()) {
+                opts.emplace_back(std::move(name), task.optional_inputs[i].param);
+            }
+        }
+        return opts;
+    }
+
     json_ptr RequestSender::Send_TFT(request& task) {
         json_ptr response;
 
         std::vector<PARAM_CONT>& params = task.params;
-        std::vector<P_NAME>& opt_names = task.optional_names;
-        std::vector<PARAM_CONT>& opt_inputs = task.optional_inputs;
         const int endpoint = task._endpoint;
         const int endpoint_method = task._endpoint_method;
         try {
@@ -161,21 +170,14 @@ namespace restfulEz {
                         case QUEUE_TOP:
                             response = this->underlying_client->Tft_League.top_by_queue(params.at(0), params.at(1));break;
                         case L_BY_TIER_DIVISION:
-                            response = this->underlying_client->Tft_League.entries(params.at(0), params.at(1), params.at(2), std::vector<std::pair<std::string, std::string>>{std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0))});break;
+                            response = this->underlying_client->Tft_League.entries(params.at(0), params.at(1), params.at(2), build_optional_params(task));break;
                         default:
                             throw std::invalid_argument("Invalid Endpoint Method Index Given for Tft_League");
                     } break;
                 case MATCH:
                     switch (endpoint_method) {
                         case M_BY_PUUID:
-                            response = this->underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), 
-                                    std::vector<std::pair<std::string, std::string>>{
-                                        std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0)),
-                                        std::pair<std::string, std::string>(opt_names.at(1), opt_inputs.at(1)),
-                                        std::pair<std::string, std::string>(opt_names.at(2), opt_inputs.at(2)),
-                                        std::pair<std::string, std::string>(opt_names.at(3), opt_inputs.at(3))
-                                    }
-                                        );break;
+                            response = this->underlying_client->Tft_Match.by_puuid(params.at(0), params.at(1), build_optional_params(task));break;
                         case M_BY_MATCH_ID:
                             response = this->underlying_client->Tft_Match.by_match_id(params.at(0), params.at(1));break;
                     } break;

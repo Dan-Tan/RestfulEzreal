@@ -93,18 +93,27 @@ namespace restfulEz {
 
     using json_ptr = std::unique_ptr<std::vector<char>>;
 
+    static std::vector<std::pair<std::string, std::string>> build_optional_params(const request& task) {
+        std::vector<std::pair<std::string, std::string>> opts;
+        for (size_t i = 0; i < task.optional_names.size() && i < task.optional_inputs.size(); ++i) {
+            std::string name = task.optional_names[i].name;
+            if (!name.empty()) {
+                opts.emplace_back(std::move(name), task.optional_inputs[i].param);
+            }
+        }
+        return opts;
+    }
+
     json_ptr RequestSender::Send_VAL(request& task) {
         json_ptr response;
 
         std::vector<PARAM_CONT>& params = task.params;
-        std::vector<P_NAME>& opt_names = task.optional_names;
-        std::vector<PARAM_CONT>& opt_inputs = task.optional_inputs;
         const int endpoint = task._endpoint;
         const int endpoint_method = task._endpoint_method;
 
         switch (endpoint) {
             case CONTENT:
-                response = this->underlying_client->Val_Content.contents(params.at(0), std::vector<std::pair<std::string, std::string>>{std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0))});break;
+                response = this->underlying_client->Val_Content.contents(params.at(0), build_optional_params(task));break;
             case MATCH:
                 switch (endpoint_method) {
                     case BY_MATCH:
@@ -117,7 +126,7 @@ namespace restfulEz {
                         throw std::invalid_argument("Invalid Endpoint Method Index Given");
                 } break;
             case RANKED:
-                response = this->underlying_client->Val_Ranked.leaderboards_by_act(params.at(0), params.at(1), std::vector<std::pair<std::string, std::string>>{std::pair<std::string, std::string>(opt_names.at(0), opt_inputs.at(0))});break;
+                response = this->underlying_client->Val_Ranked.leaderboards_by_act(params.at(0), params.at(1), build_optional_params(task));break;
             case STATUS:
                 response = this->underlying_client->Val_Status.status(params.at(0));break;
             default:
@@ -126,3 +135,4 @@ namespace restfulEz {
         return std::move(response);
     }
 }
+
