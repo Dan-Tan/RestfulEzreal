@@ -52,7 +52,7 @@ namespace restfulEz {
                         return this->stop_execution || !this->simple_requests.empty() || !this->linked_requests.empty() || !this->work.empty();
                 });
 
-                if (this->stop_execution && ( this->simple_requests.empty() || this->linked_requests.empty() || this->work.empty())) {
+                if (this->stop_execution && this->simple_requests.empty() && this->linked_requests.empty() && this->work.empty()) {
                     return;
                 }
 
@@ -63,10 +63,12 @@ namespace restfulEz {
                 } else if (!this->simple_requests.empty()) {
                     task = std::move(this->simple_requests.front());
                     this->simple_requests.pop();
+                    this->active_simple_count_.fetch_add(1);
                     iterative = false; singular = true;
                 } else if (!this->linked_requests.empty()) {
                     b_task = std::move(this->linked_requests.front());
                     this->linked_requests.pop();
+                    this->active_batch_count_.fetch_add(1);
                     iterative = true; singular = false;
                 } else {
                     throw std::logic_error("Request thread continued with no tasks");
@@ -85,6 +87,12 @@ namespace restfulEz {
                 std::cerr << "[RequestSender] Exception in background worker: " << ex.what() << std::endl;
             } catch (...) {
                 std::cerr << "[RequestSender] Unknown exception in background worker." << std::endl;
+            }
+            if (iterative) {
+                this->active_batch_count_.fetch_sub(1);
+                this->batch_active_nodes_.store(0);
+            } else if (singular) {
+                this->active_simple_count_.fetch_sub(1);
             }
         }
     }
@@ -158,6 +166,62 @@ namespace restfulEz {
     }
     };
 
+    std::string RequestSender::resolve_method_key(int game, int endpoint, int endpoint_method) {
+        if (game == 0 && endpoint == 0) {
+            switch (endpoint_method) {
+                case 0: return "Account-v1-by-puuid";
+                case 1: return "Acccount-v1-by-riot-id";
+                case 2: return "Account-v1-by-game-by-puuid";
+            }
+        } else if (game == 1) {
+            switch (endpoint) {
+                case 0: // Champion Mastery
+                    switch (endpoint_method) {
+                        case 0: return "Champion-Mastery-v4-by-puuid";
+                        case 1: return "Champion-Mastery-v4-by-puuid-by-champion";
+                        case 2: return "Champion-Mastery-v4-by-puuid-top";
+                        case 3: return "Champion-Mastery-v4-scores-by-puuid";
+                    } break;
+                case 1: return "Champion-v3=champion-rotations";
+                case 3: // League-v4
+                    switch (endpoint_method) {
+                        case 0: return "League-v4-challenger";
+                        case 1: return "League-v4-grandmaster";
+                        case 2: return "League-v4-master";
+                        case 3: return "League-v4-by-puuid";
+                        case 4: return "League-v4-by-league-id";
+                        case 5: return "League-v4-entries";
+                        case 6: return "League-exp-v4-entries";
+                    } break;
+                case 5: return "Lol-Status-v4-status";
+                case 6: // Match-v5
+                    switch (endpoint_method) {
+                        case 0: return "Match-v5-by-match-id";
+                        case 1: return "Match-v5-timeline-by-match-id";
+                        case 2: return "Match-v5-by-puuid";
+                    } break;
+                case 7: return "Summoner-v4-by-puuid";
+                case 8:
+                    return (endpoint_method == 0) ? "Spectator-v5-by-summoner-id" : "Spectator-v5-featured";
+            }
+        } else if (game == 2) {
+            if (endpoint == 0) return "Tft-League-v1-challenger";
+            if (endpoint == 1) return (endpoint_method == 0) ? "Tft-Match-v1-by-puuid" : "Tft-Match-v1-by-match-id";
+            if (endpoint == 2) return "Tft-Status-v1-status";
+            if (endpoint == 3) return "Tft-Summoner-v1-by-puuid";
+        }
+        return "";
+    }
+
+    int RequestSender::get_request_wait_time(const request& task) const {
+        if (!this->underlying_client || task.params.empty()) return 0;
+        std::string routing_str(task.params[0].param);
+        if (routing_str.empty()) return 0;
+        std::string mkey = resolve_method_key(task._game, task._endpoint, task._endpoint_method);
+        auto bd = this->underlying_client->get_wait_time_breakdown(routing_str, mkey);
+        return bd.total_wait_sec;
+    }
+
     using json_ptr = std::unique_ptr<std::vector<char>>;
 
     static bool check_failure_response(const std::vector<char>& response) {
@@ -167,11 +231,14 @@ namespace restfulEz {
     }
 
     json_ptr RequestSender::Send_Request(request& task) {
-        if (!this->underlying_client) {
+        if (!this->underlying_client && !this->custom_handler) {
             std::cerr << "[RequestSender] RiotApiClient is not initialized." << std::endl;
             if (task.success_ptr) *task.success_ptr = 2;
+            this->total_failed_requests_.fetch_add(1);
             return nullptr;
         }
+
+        this->in_flight_requests_.fetch_add(1);
 
         {
             std::lock_guard<std::mutex> lock(this->recent_mutex);
@@ -190,34 +257,49 @@ namespace restfulEz {
 
         json_ptr response = nullptr;
         try {
-            switch (task._game) {
-                case 0: // RIOT
-                    response = this->Send_Riot(task); break;
-                case 1: // LEAGUE OF LEGENDS
-                    response = this->Send_LOL(task); break;
-                case 2: // TEAMFIGHT TACTICS
-                    response = this->Send_TFT(task); break;
-                case 3: // VALORANT
-                    response = this->Send_VAL(task); break;
-                case 4: // LEGENDS OF RUNETERRA
-                    response = this->Send_LOR(task); break;
-                default:
-                    std::cerr << "[RequestSender] Invalid Game Index: " << task._game << std::endl;
-                    if (task.success_ptr) *task.success_ptr = 2;
-                    return nullptr;
+            if (this->custom_handler) {
+                response = this->custom_handler(task);
+            } else {
+                switch (task._game) {
+                    case 0: // RIOT
+                        response = this->Send_Riot(task); break;
+                    case 1: // LEAGUE OF LEGENDS
+                        response = this->Send_LOL(task); break;
+                    case 2: // TEAMFIGHT TACTICS
+                        response = this->Send_TFT(task); break;
+                    case 3: // VALORANT
+                        response = this->Send_VAL(task); break;
+                    case 4: // LEGENDS OF RUNETERRA
+                        response = this->Send_LOR(task); break;
+                    default:
+                        std::cerr << "[RequestSender] Invalid Game Index: " << task._game << std::endl;
+                        if (task.success_ptr) *task.success_ptr = 2;
+                        this->in_flight_requests_.fetch_sub(1);
+                        this->total_failed_requests_.fetch_add(1);
+                        return nullptr;
+                }
             }
         } catch (const std::exception& ex) {
             std::cerr << "[RequestSender] Exception sending request: " << ex.what() << std::endl;
             if (task.success_ptr) *task.success_ptr = 2;
+            this->in_flight_requests_.fetch_sub(1);
+            this->total_failed_requests_.fetch_add(1);
             return nullptr;
         }
+
+        this->in_flight_requests_.fetch_sub(1);
 
         bool failure = (!response || response->empty() || check_failure_response(*response));
         if (task.success_ptr) {
             *task.success_ptr = failure ? 2 : 1;
         }
-        if (!failure && response && !response->empty()) {
-            this->write_response_file(task, *response);
+        if (failure) {
+            this->total_failed_requests_.fetch_add(1);
+        } else {
+            this->total_completed_requests_.fetch_add(1);
+            if (response && !response->empty()) {
+                this->write_response_file(task, *response);
+            }
         }
         return response;
     }
@@ -334,20 +416,30 @@ namespace restfulEz {
     void RequestSender::Send_Batch_Request(std::shared_ptr<BatchRequest> batch) {
         if (!batch) return;
 
+        this->batch_dispatched_requests_.store(0);
+        auto wait_fn = [this](const request& req) -> int {
+            return this->get_request_wait_time(req);
+        };
+
         std::cout << "[RequestSender] Send_Batch_Request: Starting pipeline execution..." << std::endl;
         try {
-            request next = batch->get_next();
+            request prev = BatchRequest::FINISHED;
+            request next = batch->select_next_ready(wait_fn);
             while (!next.same_endpoint(BatchRequest::FINISHED)) {
+                this->batch_active_nodes_.store(static_cast<int>(batch->active_node_count()));
+                if (!prev.same_endpoint(BatchRequest::FINISHED) && !next.same_endpoint(prev) && wait_fn(prev) > 0) {
+                    this->interleaved_switches_.fetch_add(1);
+                    std::cout << "[RequestSender] Rate-limit interleaving: switched to ready node game="
+                              << next._game << " endpoint=" << next._endpoint << " method=" << next._endpoint_method << std::endl;
+                }
                 std::cout << "[RequestSender] Send_Batch_Request: Dispatching query game=" << next._game << " endpoint=" << next._endpoint << " method=" << next._endpoint_method << std::endl;
                 json_ptr result = this->Send_Request(next);
-                while (batch->insert_result(std::move(result))) {
-                    next = batch->get_current();
-                    if (next.same_endpoint(BatchRequest::FINISHED)) break;
-                    std::cout << "[RequestSender] Send_Batch_Request: Dispatching iterative query game=" << next._game << " endpoint=" << next._endpoint << " method=" << next._endpoint_method << std::endl;
-                    result = this->Send_Request(next);
-                }
-                next = batch->get_next();
+                this->batch_dispatched_requests_.fetch_add(1);
+                batch->insert_result(std::move(result));
+                prev = next;
+                next = batch->select_next_ready(wait_fn);
             }
+            this->batch_active_nodes_.store(0);
             std::cout << "[RequestSender] Send_Batch_Request: Pipeline completed successfully." << std::endl;
         } catch (const std::exception& ex) {
             std::cerr << "[RequestSender] Exception in Send_Batch_Request: " << ex.what() << std::endl;

@@ -13,6 +13,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 #include "src/RestfulEzreal/RestfulEzreal.h"
+#include "src/RestfulEzreal/ui_harness/UIHarness.h"
 #include <stdio.h>          // printf, fprintf
 #include <stdlib.h>         // abort
 #include <filesystem>
@@ -387,30 +388,37 @@ public:
             static ImVec2& disp_size = ImGui::GetIO().DisplaySize;
             static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar;
 
+            const float sidebar_width = std::max(180.0f, disp_size.x * 0.14f);
             ImGui::SetNextWindowPos(ImVec2(0, 0));
-            ImGui::SetNextWindowSize(ImVec2(disp_size.x * 0.1225, disp_size.y));
+            ImGui::SetNextWindowSize(ImVec2(sidebar_width, disp_size.y));
 
             ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[3]);
 
             ImGui::Begin("Navigation", NULL, window_flags);
 
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+            ImGui::TextUnformatted("  RESTful Ezreal");
+            ImGui::PopStyleColor();
+            ImGui::Separator();
+            ImGui::Spacing();
+
             if (ImGui::Selectable("Home", this->page_r == current_page::HOME)) {
-                    this->page_r = current_page::HOME; // todo ad page switch
+                    this->page_r = current_page::HOME;
             }
             if (ImGui::Selectable("Guide", this->page_r == current_page::GUIDE)) {
-                    this->page_r = current_page::GUIDE; // todo ad page switch
+                    this->page_r = current_page::GUIDE;
             }
             if (ImGui::Selectable("Advanced Requests", this->page_r == current_page::ADVANCED_REQUESTS)) {
-                    this->page_r = current_page::ADVANCED_REQUESTS; // todo ad page switch
+                    this->page_r = current_page::ADVANCED_REQUESTS;
             }
             if (ImGui::Selectable("Client Configuration", this->page_r == current_page::CLIENT_CONFIG)) {
-                    this->page_r = current_page::CLIENT_CONFIG; // todo ad page switch
+                    this->page_r = current_page::CLIENT_CONFIG;
             }
             if (ImGui::Selectable("Request History", this->page_r == current_page::REQUEST_HISTORY)) {
-                    this->page_r = current_page::REQUEST_HISTORY; // todo ad page switch
+                    this->page_r = current_page::REQUEST_HISTORY;
             }
             if (ImGui::Selectable("Request Status", this->page_r == current_page::REQUEST_STATUS)) {
-                    this->page_r = current_page::REQUEST_STATUS; // todo ad page switch
+                    this->page_r = current_page::REQUEST_STATUS;
             }
 
             ImGui::PopFont();
@@ -420,8 +428,26 @@ public:
 };
 
 // Main code
-int main(int, char**)
+int main(int argc, char** argv)
 {
+    bool skip_welcome = false;
+    std::string workspace_dir = "./output";
+    std::string ui_script = "";
+    int max_frames = 0;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--skip-welcome") {
+            skip_welcome = true;
+        } else if (arg == "--workspace" && i + 1 < argc) {
+            workspace_dir = argv[++i];
+        } else if (arg == "--ui-script" && i + 1 < argc) {
+            ui_script = argv[++i];
+        } else if (arg == "--max-frames" && i + 1 < argc) {
+            max_frames = std::atoi(argv[++i]);
+        }
+    }
+
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
         return 1;
@@ -482,37 +508,31 @@ int main(int, char**)
     init_info.CheckVkResultFn = check_vk_result;
     ImGui_ImplVulkan_Init(&init_info, wd->RenderPass);
 
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-    // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
-    //IM_ASSERT(font != nullptr);
-    io.Fonts->AddFontDefault();
     std::string font_light = std::filesystem::exists("./fonts/Inconsolata-Light.ttf") ? "./fonts/Inconsolata-Light.ttf" : 
                             (std::filesystem::exists("../fonts/Inconsolata-Light.ttf") ? "../fonts/Inconsolata-Light.ttf" : "");
     std::string font_med = std::filesystem::exists("./fonts/Inconsolata-Medium.ttf") ? "./fonts/Inconsolata-Medium.ttf" : 
                           (std::filesystem::exists("../fonts/Inconsolata-Medium.ttf") ? "../fonts/Inconsolata-Medium.ttf" : "");
 
+    // Load Inconsolata-Medium 15.0f first as default application font (Fonts[0])
+    ImFont* default_font = nullptr;
+    if (!font_med.empty()) {
+        default_font = io.Fonts->AddFontFromFileTTF(font_med.c_str(), 15.0f);
+    } else {
+        default_font = io.Fonts->AddFontDefault();
+    }
+    io.FontDefault = default_font;
+
+    // Specialized header and body fonts (Fonts[1]..Fonts[4])
     if (!font_light.empty()) {
-        io.Fonts->AddFontFromFileTTF(font_light.c_str(),  75.0f);
-        io.Fonts->AddFontFromFileTTF(font_light.c_str(),  20.0f);
+        io.Fonts->AddFontFromFileTTF(font_light.c_str(),  75.0f); // Fonts[1]
+        io.Fonts->AddFontFromFileTTF(font_light.c_str(),  20.0f); // Fonts[2]
     } else {
         io.Fonts->AddFontDefault();
         io.Fonts->AddFontDefault();
     }
     if (!font_med.empty()) {
-        io.Fonts->AddFontFromFileTTF(font_med.c_str(), 15.0f);
-        io.Fonts->AddFontFromFileTTF(font_med.c_str(), 10.0f);
+        io.Fonts->AddFontFromFileTTF(font_med.c_str(), 15.0f); // Fonts[3]
+        io.Fonts->AddFontFromFileTTF(font_med.c_str(), 10.0f); // Fonts[4]
     } else {
         io.Fonts->AddFontDefault();
         io.Fonts->AddFontDefault();
@@ -550,20 +570,30 @@ int main(int, char**)
     }
 
     // Our state
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    ImVec4 clear_color = ImVec4(0.06f, 0.05f, 0.07f, 1.00f);
 
     std::shared_ptr<NavBar> navigBar = std::make_shared<NavBar>();
     std::shared_ptr<restfulEz::RestfulEzreal> _main = std::make_shared<restfulEz::RestfulEzreal>(&navigBar->page_r);
 
+    if (skip_welcome) {
+        _main->SkipWelcomeAndInit(workspace_dir);
+    }
+
+    auto& harness = restfulEz::UIHarness::GetInstance();
+    harness.SetContext(window, _main.get(), &navigBar->page_r, []() {
+        vkDeviceWaitIdle(g_Device);
+    });
+    if (!ui_script.empty()) {
+        harness.LoadScript(ui_script);
+    }
+    if (max_frames > 0) {
+        harness.Enable(true);
+        harness.SetMaxFrames(max_frames);
+    }
+
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
 
         // Resize swap chain?
@@ -583,10 +613,13 @@ int main(int, char**)
         // Start the Dear ImGui frame
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
+        harness.BeginFrame(io);
         ImGui::NewFrame();
 
         navigBar->render();
         _main->OnUIRender();
+
+        harness.EndFrame();
 
         // Rendering
         ImGui::Render();
@@ -600,6 +633,7 @@ int main(int, char**)
             wd->ClearValue.color.float32[3] = clear_color.w;
             FrameRender(wd, draw_data);
             FramePresent(wd);
+            harness.PostPresent();
         }
     }
 

@@ -69,9 +69,6 @@ int main() {
 
     // Cleanup
     std::filesystem::remove_all(test_ws);
-    if (std::filesystem::exists("./output")) {
-        std::filesystem::remove_all("./output");
-    }
     std::cout << "[Test] All FileManager tests passed successfully!" << std::endl;
     return 0;
 }

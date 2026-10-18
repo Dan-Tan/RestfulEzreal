@@ -1,4 +1,5 @@
 #include "FileManager.h"
+#include "TemplateManager.h"
 #include "simdjson.h"
 #include <nfd.h>
 #include <fstream>
@@ -102,13 +103,17 @@ void FileManager::UpdateWorkspacePaths() {
         workspace_paths_.raw_accounts = workspace_paths_.raw_dir / "accounts";
         workspace_paths_.raw_matches = workspace_paths_.raw_dir / "matches";
         workspace_paths_.raw_timelines = workspace_paths_.raw_dir / "timelines";
+        workspace_paths_.templates_dir = workspace_paths_.root_dir / "templates";
         workspace_paths_.log_file = fs::path(config_.log_path);
 
         fs::create_directories(workspace_paths_.root_dir / "db");
         fs::create_directories(workspace_paths_.raw_accounts);
         fs::create_directories(workspace_paths_.raw_matches);
         fs::create_directories(workspace_paths_.raw_timelines);
+        fs::create_directories(workspace_paths_.templates_dir);
         fs::create_directories(workspace_paths_.root_dir / "logs");
+
+        TemplateManager::GetInstance().EnsureStarterTemplatesInWorkspace(workspace_paths_.templates_dir);
 
         if (workspace_paths_.log_file.has_parent_path()) {
             fs::create_directories(workspace_paths_.log_file.parent_path());
@@ -201,6 +206,44 @@ bool FileManager::SaveConfig(const std::string& config_path) {
     }
 }
 
+bool FileManager::LoadEnvKey(const std::string& env_path) {
+    const char* env_key = std::getenv("RIOT_KEY");
+    if (env_key && env_key[0] != '\0') {
+        SetApiKey(env_key);
+        if (!config_.api_key.empty()) {
+            return true;
+        }
+    }
+
+    std::vector<std::string> candidates = {env_path, "./.env", "../.env"};
+    for (const auto& candidate : candidates) {
+        if (candidate.empty() || !fs::exists(candidate)) continue;
+        std::ifstream file(candidate);
+        if (!file.is_open()) continue;
+
+        std::string line;
+        while (std::getline(file, line)) {
+            std::string trimmed = trim_string(line);
+            if (trimmed.empty() || trimmed[0] == '#') continue;
+
+            if (trimmed.rfind("export ", 0) == 0) {
+                trimmed = trim_string(trimmed.substr(7));
+            }
+            if (trimmed.rfind("RIOT_KEY", 0) == 0) {
+                size_t eq_pos = trimmed.find('=');
+                if (eq_pos != std::string::npos) {
+                    std::string val = trim_string(trimmed.substr(eq_pos + 1));
+                    if (!val.empty()) {
+                        SetApiKey(val);
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void FileManager::SetApiKey(const std::string& key) {
     config_.api_key = trim_string(key);
 }
@@ -267,6 +310,27 @@ std::string FileManager::OpenFileDialog(const std::string& filter_desc, const st
         result = NFD_OpenDialog(&out_path, filter_item, 1, nullptr);
     } else {
         result = NFD_OpenDialog(&out_path, nullptr, 0, nullptr);
+    }
+
+    if (result == NFD_OKAY && out_path) {
+        result_path = std::string(out_path);
+        NFD_FreePathN(out_path);
+    }
+    NFD_Quit();
+    return result_path;
+}
+
+std::string FileManager::SaveFileDialog(const std::string& default_name, const std::string& filter_desc, const std::string& filter_ext) {
+    NFD_Init();
+    std::string result_path = "";
+    nfdchar_t* out_path = nullptr;
+
+    nfdresult_t result;
+    if (!filter_ext.empty()) {
+        nfdfilteritem_t filter_item[1] = {{filter_desc.c_str(), filter_ext.c_str()}};
+        result = NFD_SaveDialog(&out_path, filter_item, 1, nullptr, default_name.empty() ? nullptr : default_name.c_str());
+    } else {
+        result = NFD_SaveDialog(&out_path, nullptr, 0, nullptr, default_name.empty() ? nullptr : default_name.c_str());
     }
 
     if (result == NFD_OKAY && out_path) {

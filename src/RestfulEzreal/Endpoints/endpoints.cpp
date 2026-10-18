@@ -130,7 +130,14 @@ namespace restfulEz {
                 last_iter[2] = 0;
             }
 
-            float drop_down_width = (0.3f * ImGui::GetContentRegionAvail().x);
+            float avail_w = ImGui::GetContentRegionAvail().x;
+            // Bound total width so that dropdowns + Add button terminate before x = 980px
+            float target_total = std::min(avail_w - 300.0f, 760.0f);
+            if (target_total < 450.0f) target_total = 450.0f;
+            float drop_down_width = (target_total - 60.0f - ImGui::GetStyle().ItemSpacing.x * 3.0f) / 3.0f;
+            if (drop_down_width > 230.0f) drop_down_width = 230.0f;
+            if (drop_down_width < 120.0f) drop_down_width = 120.0f;
+
             ImGui::SetNextItemWidth(drop_down_width);
             if (ImGui::BeginCombo("##input1", GAMES_[game], ImGuiComboFlags_None))
             {
@@ -180,9 +187,13 @@ namespace restfulEz {
             }
             ImGui::SameLine();
 
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.92f, 0.68f, 0.01f, 0.25f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.68f, 0.01f, 0.65f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.92f, 0.68f, 0.01f, 1.00f));
             if (ImGui::Button("Add")) {
                 this->NewQueryForm(game, endpoint, endpoint_method);
             }
+            ImGui::PopStyleColor(3);
     }
 
     static const inline std::string create_filename(const request& name_request) {

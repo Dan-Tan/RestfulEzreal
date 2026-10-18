@@ -25,6 +25,7 @@ struct WorkspacePaths {
     fs::path raw_matches;
     fs::path raw_timelines;
     fs::path log_file;
+    fs::path templates_dir;
 };
 
 class FileManager {
@@ -41,6 +42,7 @@ public:
     void SanitizeConfig();
 
     // API Key management (independent of workspace/db paths)
+    bool LoadEnvKey(const std::string& env_path = ".env");
     void SetApiKey(const std::string& key);
     const std::string& GetApiKey() const;
     std::string GetDevKeyPrefix() const;
@@ -54,6 +56,7 @@ public:
 
     // Native file dialog helpers
     static std::string OpenFileDialog(const std::string& filter_desc = "", const std::string& filter_ext = "");
+    static std::string SaveFileDialog(const std::string& default_name = "", const std::string& filter_desc = "", const std::string& filter_ext = "");
     static std::string SelectFolderDialog();
 
     AppConfig& GetConfig() { return config_; }

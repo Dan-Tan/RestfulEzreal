@@ -46,6 +46,8 @@ namespace restfulEz {
             int _next_form_id = 1;
 
             std::string custom_config_path;
+            bool show_welcome = true;
+            int welcome_state = -1;
 
         public:
             RestfulEzreal(current_page* on_display);
@@ -55,6 +57,7 @@ namespace restfulEz {
             }
 
             void OnUIRender();
+            void SkipWelcomeAndInit(const std::string& workspace_dir = "./output");
             int render_welcome();
             int render_welcome_config();
             QUERY_FORM* _next_request = nullptr;
@@ -74,11 +77,31 @@ namespace restfulEz {
 
             void render_home();
             void render_client_status();
-            void render_guide() {};
+            void render_guide();
             void render_advanced_requests();
-            void render_client_config() {};
-            void render_json() {};
-            void render_rate_status() {};
+            void render_client_config();
+            void render_json();
+            void render_rate_status();
+
+            // Client Config page state
+            char _config_key_input[256] = "";
+            bool _config_key_initialized = false;
+            int _config_log_level = 2; // spdlog::level::info
+            bool _config_verbosity = false;
+            std::string _config_status_message;
+
+            // Request History page state
+            std::string _history_selected_file;
+            std::string _history_file_content;
+            std::vector<std::string> _history_formatted_lines;
+            bool _history_content_loaded = false;
+            int _history_category = 0; // 0=All, 1=Accounts, 2=Matches, 3=Timelines
+            std::vector<std::pair<std::string, std::string>> _cached_file_list; // {rel_path, abs_path}
+            int _history_last_refresh_frame = -100;
+            void refresh_history_files();
+
+            // Client State collapse toggle
+            bool _client_state_collapsed = true;
             
             void configure_from_existing(bool custom_path = false, const std::string& file_path = std::string(""));
             bool configure_new_client(bool allow_close = false);

@@ -56,8 +56,13 @@ public:
     bool MergePlayers(const std::string& target_player_id, const std::string& source_player_id);
 
     // Queries
+    bool HasPlayerPuuid(const std::string& puuid);
     bool HasMatch(const std::string& match_id);
+    bool HasTimeline(const std::string& match_id);
     int64_t GetMatchCount();
+    int64_t GetTimelineCount();
+    int64_t GetMatchParticipantCount(const std::string& match_id);
+    std::string GetParticipantPlayerId(const std::string& match_id, int participant_id);
     int64_t GetPlayerCount();
     int64_t GetAccountCount(); // Alias for player count
 

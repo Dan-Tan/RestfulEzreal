@@ -13,6 +13,8 @@ tempbuild/
 *.duckdb
 *.duckdb.wal
 EzrealRunes.json
+.env
+.env.*
 output/
 configs/
 test_output/

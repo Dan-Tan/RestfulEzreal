@@ -1,4 +1,6 @@
 #include "QueryForm.h"
+#include "TemplateManager.h"
+#include "FileManager.h"
 #include "BatchRequests.h"
 #include "RestfulEzreal.h"
 #include "imgui.h"
@@ -248,11 +250,207 @@ namespace restfulEz {
     ImVec2 LinkedForm<N>::default_size = ImVec2(0, 0);
 
     void BatchForm::render_form() {
-        this->newFormButton();
-        ImGui::SameLine();
-        if (ImGui::Button("Execute")) {
-            this->execute_request();
+        if (this->lifecycle == BatchLifecycleState::RUNNING) {
+            if (this->active_batch && this->active_batch->is_completed()) {
+                bool has_failed = false;
+                for (const auto& form : this->forms) {
+                    if (form && form->get_tracker()) {
+                        if (form->get_tracker()->state.load() == NodeExecState::FAILED) {
+                            has_failed = true;
+                            break;
+                        }
+                    }
+                }
+                this->lifecycle = has_failed ? BatchLifecycleState::FAILED : BatchLifecycleState::COMPLETED;
+            }
         }
+
+        this->newFormButton();
+
+        // Templates Menu & Pipeline Controls (Row 2)
+        if (ImGui::Button("Templates")) {
+            ImGui::OpenPopup("TemplatesPopup");
+        }
+        if (ImGui::BeginPopup("TemplatesPopup")) {
+            if (ImGui::Selectable("Starter: Match History & Timelines")) {
+                TemplateManager::GetInstance().LoadTemplateFromString(
+                    TemplateManager::GetInstance().GetStarterMatchHistoryTimelinesJson(),
+                    *this
+                );
+                this->show_quick_fill = true;
+            }
+            if (ImGui::Selectable("Starter: Match Participants Expansion")) {
+                TemplateManager::GetInstance().LoadTemplateFromString(
+                    TemplateManager::GetInstance().GetStarterParticipantExpansionJson(),
+                    *this
+                );
+                this->show_quick_fill = true;
+            }
+            if (ImGui::Selectable("Starter: Challenger Database Builder")) {
+                TemplateManager::GetInstance().LoadTemplateFromString(
+                    TemplateManager::GetInstance().GetStarterChallengerDatabaseJson(),
+                    *this
+                );
+            }
+            ImGui::Separator();
+            auto tdir = FileManager::GetInstance().GetWorkspacePaths().templates_dir;
+            auto available = TemplateManager::GetInstance().ListAvailableTemplates(tdir);
+            for (const auto& tmpl_pair : available) {
+                if (ImGui::Selectable(tmpl_pair.first.c_str())) {
+                    TemplateManager::GetInstance().LoadTemplate(tmpl_pair.second.string(), *this);
+                    this->show_quick_fill = true;
+                }
+            }
+            if (!available.empty()) {
+                ImGui::Separator();
+            }
+            if (ImGui::Selectable("Load Template File...")) {
+                std::string file_path = FileManager::OpenFileDialog("Template JSON (*.json)", "json");
+                if (!file_path.empty()) {
+                    TemplateManager::GetInstance().LoadTemplate(file_path, *this);
+                    this->show_quick_fill = true;
+                }
+            }
+            if (ImGui::Selectable("Save Current Template...")) {
+                this->show_save_modal = true;
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::SameLine();
+
+        if (ImGui::Button("Save Template")) {
+            this->show_save_modal = true;
+        }
+        ImGui::SameLine();
+
+        if (ImGui::Button("Quick Fill")) {
+            this->show_quick_fill = true;
+        }
+        ImGui::SameLine();
+
+        if (this->lifecycle == BatchLifecycleState::RUNNING) {
+            ImGui::BeginDisabled();
+            ImGui::Button("Running Pipeline...");
+            ImGui::EndDisabled();
+        } else if (this->lifecycle == BatchLifecycleState::COMPLETED || this->lifecycle == BatchLifecycleState::FAILED) {
+            if (ImGui::Button("Reset Pipeline")) {
+                this->reset_pipeline();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Re-run")) {
+                this->reset_pipeline();
+                this->execute_request();
+            }
+        } else {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.92f, 0.68f, 0.01f, 0.40f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.68f, 0.01f, 0.70f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+            if (ImGui::Button("Execute")) {
+                this->execute_request();
+            }
+            ImGui::PopStyleColor(3);
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Clear Canvas")) {
+            this->clear_canvas();
+        }
+
+        // Render Quick Fill Modal
+        if (this->show_quick_fill) {
+            ImGui::OpenPopup("Quick Fill Starting Parameters");
+        }
+        if (ImGui::BeginPopupModal("Quick Fill Starting Parameters", &this->show_quick_fill, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("Enter Starting Account Parameters for Root Request:");
+            ImGui::Spacing();
+
+            ImGui::Text("Routing Region:");
+            ImGui::SameLine(130.0f);
+            ImGui::SetNextItemWidth(200.0f);
+            ImGui::InputText("##Routing", this->quick_fill_routing, sizeof(this->quick_fill_routing));
+
+            ImGui::Text("Game Name:");
+            ImGui::SameLine(130.0f);
+            ImGui::SetNextItemWidth(200.0f);
+            ImGui::InputText("##Game Name", this->quick_fill_game_name, sizeof(this->quick_fill_game_name));
+
+            ImGui::Text("Tagline:");
+            ImGui::SameLine(130.0f);
+            ImGui::SetNextItemWidth(200.0f);
+            ImGui::InputText("##Tagline", this->quick_fill_tagline, sizeof(this->quick_fill_tagline));
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (ImGui::Button("Apply")) {
+                TemplateManager::GetInstance().QuickFillRootParameters(
+                    *this,
+                    std::string(this->quick_fill_routing),
+                    std::string(this->quick_fill_game_name),
+                    std::string(this->quick_fill_tagline)
+                );
+                this->show_quick_fill = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel")) {
+                this->show_quick_fill = false;
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
+        // Render Save Template Modal
+        if (this->show_save_modal) {
+            ImGui::OpenPopup("Save Pipeline Template");
+        }
+        if (ImGui::BeginPopupModal("Save Pipeline Template", &this->show_save_modal, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("Save Pipeline Graph Template");
+            ImGui::Spacing();
+
+            ImGui::Text("Template Name:");
+            ImGui::SetNextItemWidth(300.0f);
+            ImGui::InputText("##SaveTemplateName", this->save_template_name, sizeof(this->save_template_name));
+
+            ImGui::Text("Description:");
+            ImGui::SetNextItemWidth(300.0f);
+            ImGui::InputText("##SaveTemplateDesc", this->save_template_desc, sizeof(this->save_template_desc));
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (ImGui::Button("Save to Workspace")) {
+                auto tdir = FileManager::GetInstance().GetWorkspacePaths().templates_dir;
+                std::string filename = std::string(this->save_template_name);
+                for (char& c : filename) {
+                    if (c == ' ' || c == '/' || c == '\\' || c == ':') c = '_';
+                }
+                std::string full_path = (tdir / (filename + ".json")).string();
+                TemplateManager::GetInstance().SaveTemplate(full_path, this->save_template_name, this->save_template_desc, *this);
+                this->show_save_modal = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Browse & Save...")) {
+                std::string file_path = FileManager::SaveFileDialog("pipeline_template.json", "Template JSON (*.json)", "json");
+                if (!file_path.empty()) {
+                    TemplateManager::GetInstance().SaveTemplate(file_path, this->save_template_name, this->save_template_desc, *this);
+                    this->show_save_modal = false;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel")) {
+                this->show_save_modal = false;
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+        }
+
         if (this->first_iter) {
             this->first_iter = false;
             ImVec2 new_size = ImGui::GetContentRegionAvail();
@@ -262,6 +460,7 @@ namespace restfulEz {
             LinkedForm<4>::set_default_size(new_size);
             LinkedForm<5>::set_default_size(new_size);
         }
+        ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), 80.0f));
         if (this->linking_mode) {
             for (std::shared_ptr<LinkedInterface>& form : this->forms) {
                 if (form->render_form(true)) {
@@ -278,6 +477,18 @@ namespace restfulEz {
                     this->child = form;
                     this->linking_mode = true;
                 };
+            }
+        }
+
+        // Deferred node removal pass
+        for (auto it = this->forms.begin(); it != this->forms.end(); ) {
+            if ((*it)->check_remove()) {
+                if (this->child == *it) { this->child = nullptr; this->linking_mode = false; }
+                if (this->parent == *it) { this->parent = nullptr; this->linking_mode = false; }
+                (*it)->disconnect_all();
+                it = this->forms.erase(it);
+            } else {
+                ++it;
             }
         }
     }
@@ -351,7 +562,8 @@ namespace restfulEz {
             last_iter[2] = 0;
         }
 
-        float drop_down_width = (0.3f * ImGui::GetContentRegionAvail().x);
+        float drop_down_width = std::min(135.0f, (ImGui::GetContentRegionAvail().x - 60.0f) / 3.0f);
+        if (drop_down_width < 100.0f) drop_down_width = 100.0f;
         ImGui::SetNextItemWidth(drop_down_width);
         if (ImGui::BeginCombo("##input1", GAMES_[game], ImGuiComboFlags_None))
         {
@@ -411,6 +623,15 @@ namespace restfulEz {
         this->forms.back()->set_id(this->current_ID);
         this->current_ID++;
     }
+
+    void BatchForm::add_form(std::shared_ptr<LinkedInterface> form) {
+        if (form) {
+            this->forms.push_back(form);
+            if (form->get_id() >= this->current_ID) {
+                this->current_ID = form->get_id() + 1;
+            }
+        }
+    }
     
     std::shared_ptr<BatchRequest> BatchForm::construct_request() {
         for (auto& form : this->forms) {
@@ -433,7 +654,39 @@ namespace restfulEz {
         return std::make_shared<BatchRequest>(initial_requests);
     }
 
+    void BatchForm::clear_canvas() {
+        for (auto& form : this->forms) {
+            if (form) {
+                form->disconnect_all();
+                form->detach_base();
+            }
+        }
+        this->forms.clear();
+        this->current_ID = 0;
+        this->linking_mode = false;
+        this->parent = nullptr;
+        this->child = nullptr;
+        this->lifecycle = BatchLifecycleState::IDLE;
+        this->active_batch = nullptr;
+    }
+
+    void BatchForm::reset_pipeline() {
+        for (auto& form : this->forms) {
+            if (form) {
+                form->reset_tracker();
+                form->detach_base();
+            }
+        }
+        this->lifecycle = BatchLifecycleState::IDLE;
+        this->active_batch = nullptr;
+    }
+
     void BatchForm::execute_request() {
+        if (this->lifecycle == BatchLifecycleState::RUNNING) {
+            std::cout << "[BatchForm] Pipeline is already running." << std::endl;
+            return;
+        }
+
         bool ready = true;
         for (const auto& form : this->forms) {
             if (form) {
@@ -451,6 +704,9 @@ namespace restfulEz {
             return;
         }
 
+        this->active_batch = final_form;
+        this->lifecycle = BatchLifecycleState::RUNNING;
+
         if (this->sender) {
             std::cout << "[BatchForm] Enqueuing batch request..." << std::endl;
             this->sender->add_batch_request(final_form);
@@ -458,7 +714,7 @@ namespace restfulEz {
             std::cerr << "[BatchForm] ERROR: sender is null on BatchForm!" << std::endl;
         }
         
-        // remove forms pointer to original pointer to prevent uses interference during requests
+        // remove forms pointer to original pointer to prevent user interference during requests
         for (auto& frm : this->forms) {
             if (frm) {
                 frm->detach_base();
@@ -497,7 +753,7 @@ namespace restfulEz {
 
         // remove button
         static char _del_id[] = "Remove##0a";
-        _del_id[8] = ind;
+        _del_id[8] = (char)('0' + ind);
         _del_id[9] = second ? 'b' : 'a';
         
         if (keys.size() != 0) {
@@ -516,7 +772,7 @@ namespace restfulEz {
         bool active = render_json_form(before, ind, x_align, width, active_field, false);
 
         static char _lim_id[] = "Iteration Limit##0";
-        _lim_id[17] = ind;
+        _lim_id[17] = (char)('0' + ind);
         ImGui::SetCursorPosX(x_align);
         ImGui::SetNextItemWidth(width - x_align - 0.5 * (x_align - ImGui::GetWindowSize().x * 0.25));
         ImGui::InputText(_lim_id, iter_limit, 8, ImGuiInputTextFlags_CharsDecimal);

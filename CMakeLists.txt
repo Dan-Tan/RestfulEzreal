@@ -67,6 +67,7 @@ set(SOURCE_DIR src/RestfulEzreal)
 
 add_library(RestfulEzreal STATIC 
     ${SOURCE_DIR}/FileManager.cpp
+    ${SOURCE_DIR}/TemplateManager.cpp
     ${SOURCE_DIR}/QueryForm.cpp
     ${SOURCE_DIR}/RequestQueue.cpp
     ${SOURCE_DIR}/BatchRequests.cpp
@@ -78,6 +79,7 @@ add_library(RestfulEzreal STATIC
     ${SOURCE_DIR}/RestfulEzreal.cpp
     ${SOURCE_DIR}/utils/utils.cpp
     ${SOURCE_DIR}/db/DatabaseManager.cpp
+    ${SOURCE_DIR}/ui_harness/UIHarness.cpp
     ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp 
     ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp 
     ${IMGUI_DIR}/imgui.cpp 
@@ -89,7 +91,7 @@ add_library(RestfulEzreal STATIC
 )
 
 target_link_libraries(RestfulEzreal PUBLIC ${LIBRARIES})
-target_compile_definitions(RestfulEzreal PUBLIC -DImTextureID=ImU64)
+target_compile_definitions(RestfulEzreal PUBLIC -DImTextureID=ImU64 -DIMGUI_ENABLE_TEST_ENGINE)
 
 target_compile_definitions(RestfulEzreal PRIVATE $<$<CONFIG:Debug>:DEBUG_MODE>)
 
@@ -124,6 +126,28 @@ target_link_libraries(test_file_manager PRIVATE RestfulEzreal)
 add_executable(test_batch tests/test_batch.cpp)
 target_include_directories(test_batch PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
 target_link_libraries(test_batch PRIVATE RestfulEzreal)
+
+add_executable(test_linked_db_integration tests/test_linked_db_integration.cpp)
+target_include_directories(test_linked_db_integration PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_linked_db_integration PRIVATE RestfulEzreal)
+
+add_executable(test_live_pipeline tests/test_live_pipeline.cpp)
+target_include_directories(test_live_pipeline PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_live_pipeline PRIVATE RestfulEzreal)
+
+add_executable(test_m1_challenger2 tests/test_m1_challenger2.cpp)
+target_include_directories(test_m1_challenger2 PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_m1_challenger2 PRIVATE RestfulEzreal)
+
+add_executable(test_template tests/test_template.cpp)
+target_include_directories(test_template PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_template PRIVATE RestfulEzreal)
+
+add_executable(test_m2_adversarial tests/test_m2_adversarial.cpp)
+target_include_directories(test_m2_adversarial PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_m2_adversarial PRIVATE RestfulEzreal)
+
+
 
 
 

@@ -241,7 +241,11 @@ std::string DatabaseManager::ResolveOrCreatePlayer(const std::string& dev_key_pr
             duckdb_result res;
             if (duckdb_execute_prepared(stmt, &res) != DuckDBError) {
                 if (duckdb_row_count(&res) > 0) {
-                    player_id = std::string(duckdb_value_varchar(&res, 0, 0));
+                    char* val = duckdb_value_varchar(&res, 0, 0);
+                    if (val) {
+                        player_id = std::string(val);
+                        duckdb_free(val);
+                    }
                 }
             }
             duckdb_destroy_result(&res);
@@ -258,7 +262,11 @@ std::string DatabaseManager::ResolveOrCreatePlayer(const std::string& dev_key_pr
             duckdb_result res;
             if (duckdb_execute_prepared(stmt, &res) != DuckDBError) {
                 if (duckdb_row_count(&res) > 0) {
-                    player_id = std::string(duckdb_value_varchar(&res, 0, 0));
+                    char* val = duckdb_value_varchar(&res, 0, 0);
+                    if (val) {
+                        player_id = std::string(val);
+                        duckdb_free(val);
+                    }
                 }
             }
             duckdb_destroy_result(&res);
@@ -371,7 +379,25 @@ bool DatabaseManager::MergePlayers(const std::string& target_player_id, const st
     if (!initialized_ || !conn_) return false;
 
     duckdb_result res;
-    // 1. Re-point player_aliases
+    // 1. Delete overlapping aliases on source before re-pointing remaining player_aliases
+    duckdb_prepared_statement stmt0;
+    if (duckdb_prepare(conn_, R"(
+        DELETE FROM player_aliases
+        WHERE player_id = $2
+          AND EXISTS (
+              SELECT 1 FROM player_aliases t
+              WHERE t.player_id = $1
+                AND t.game_name = player_aliases.game_name
+                AND t.tag_line = player_aliases.tag_line
+          );
+    )", &stmt0) != DuckDBError) {
+        duckdb_bind_varchar(stmt0, 1, target_player_id.c_str());
+        duckdb_bind_varchar(stmt0, 2, source_player_id.c_str());
+        duckdb_execute_prepared(stmt0, &res);
+        duckdb_destroy_result(&res);
+        duckdb_destroy_prepare(&stmt0);
+    }
+
     duckdb_prepared_statement stmt1;
     if (duckdb_prepare(conn_, "UPDATE player_aliases SET player_id = $1 WHERE player_id = $2;", &stmt1) != DuckDBError) {
         duckdb_bind_varchar(stmt1, 1, target_player_id.c_str());
@@ -416,7 +442,7 @@ bool DatabaseManager::MergePlayers(const std::string& target_player_id, const st
 
 bool DatabaseManager::SaveMatch(const std::string& match_id, const std::string& raw_json_str, const std::string& primary_player_id) {
     std::lock_guard<std::recursive_mutex> lock(db_mutex_);
-    if (!initialized_ || !conn_) return false;
+    if (!initialized_ || !conn_ || raw_json_str.empty()) return false;
 
     int64_t game_creation = 0;
     int64_t game_duration = 0;
@@ -444,86 +470,86 @@ bool DatabaseManager::SaveMatch(const std::string& match_id, const std::string& 
         simdjson::padded_string padded(raw_json_str.data(), raw_json_str.size());
         simdjson::dom::parser parser;
         simdjson::dom::element doc;
-        if (parser.parse(padded).get(doc) == simdjson::SUCCESS) {
-            // Reject error responses
-            if (doc["status"].error() == simdjson::SUCCESS) {
-                return false;
-            }
-            simdjson::dom::element info;
-            if (doc["info"].get(info) != simdjson::SUCCESS) {
-                return false;
-            }
+        if (parser.parse(padded).get(doc) != simdjson::SUCCESS) {
+            return false;
+        }
+        // Reject error responses
+        if (doc["status"].error() == simdjson::SUCCESS) {
+            return false;
+        }
+        simdjson::dom::element info;
+        if (doc["info"].get(info) != simdjson::SUCCESS) {
+            return false;
+        }
 
-            std::string_view mid_sv;
-            if (doc["metadata"]["matchId"].get(mid_sv) == simdjson::SUCCESS && !mid_sv.empty()) {
-                actual_match_id = std::string(mid_sv);
-            }
+        std::string_view mid_sv;
+        if (doc["metadata"]["matchId"].get(mid_sv) == simdjson::SUCCESS && !mid_sv.empty()) {
+            actual_match_id = std::string(mid_sv);
+        }
 
+        int64_t val_int = 0;
+        if (info["gameCreation"].get(val_int) == simdjson::SUCCESS) {
+            game_creation = val_int;
+        }
+        if (info["gameDuration"].get(val_int) == simdjson::SUCCESS) {
+            game_duration = val_int;
+        }
+        std::string_view gv_sv;
+        if (info["gameVersion"].get(gv_sv) == simdjson::SUCCESS) {
+            game_version = std::string(gv_sv);
+        }
+        if (info["queueId"].get(val_int) == simdjson::SUCCESS) {
+            queue_id = static_cast<int32_t>(val_int);
+        }
 
-            int64_t val_int = 0;
-            if (info["gameCreation"].get(val_int) == simdjson::SUCCESS) {
-                game_creation = val_int;
-            }
-            if (info["gameDuration"].get(val_int) == simdjson::SUCCESS) {
-                game_duration = val_int;
-            }
-            std::string_view gv_sv;
-            if (info["gameVersion"].get(gv_sv) == simdjson::SUCCESS) {
-                game_version = std::string(gv_sv);
-            }
-            if (info["queueId"].get(val_int) == simdjson::SUCCESS) {
-                queue_id = static_cast<int32_t>(val_int);
-            }
-
-            // Parse participants
-            simdjson::dom::array parts_arr;
-            if (info["participants"].get(parts_arr) == simdjson::SUCCESS) {
-                for (simdjson::dom::element p : parts_arr) {
-                    ParticipantRow row;
-                    int64_t pid_val = 0;
-                    if (p["participantId"].get(pid_val) == simdjson::SUCCESS) {
-                        row.participant_id = static_cast<int>(pid_val);
-                    }
-                    std::string_view sv;
-                    if (p["puuid"].get(sv) == simdjson::SUCCESS) {
-                        row.puuid = std::string(sv);
-                    }
-                    if (p["riotIdGameName"].get(sv) == simdjson::SUCCESS) {
-                        row.game_name = std::string(sv);
-                    } else if (p["summonerName"].get(sv) == simdjson::SUCCESS) {
-                        row.game_name = std::string(sv);
-                    }
-                    if (p["riotIdTagline"].get(sv) == simdjson::SUCCESS) {
-                        row.tag_line = std::string(sv);
-                    }
-                    if (p["championName"].get(sv) == simdjson::SUCCESS) {
-                        row.champion_name = std::string(sv);
-                    }
-                    if (p["championId"].get(pid_val) == simdjson::SUCCESS) {
-                        row.champion_id = static_cast<int>(pid_val);
-                    }
-                    if (p["teamId"].get(pid_val) == simdjson::SUCCESS) {
-                        row.team_id = static_cast<int>(pid_val);
-                    }
-                    if (p["kills"].get(pid_val) == simdjson::SUCCESS) {
-                        row.kills = static_cast<int>(pid_val);
-                    }
-                    if (p["deaths"].get(pid_val) == simdjson::SUCCESS) {
-                        row.deaths = static_cast<int>(pid_val);
-                    }
-                    if (p["assists"].get(pid_val) == simdjson::SUCCESS) {
-                        row.assists = static_cast<int>(pid_val);
-                    }
-                    bool b_val = false;
-                    if (p["win"].get(b_val) == simdjson::SUCCESS) {
-                        row.win = b_val;
-                    }
-                    participants.push_back(std::move(row));
+        // Parse participants
+        simdjson::dom::array parts_arr;
+        if (info["participants"].get(parts_arr) == simdjson::SUCCESS) {
+            for (simdjson::dom::element p : parts_arr) {
+                ParticipantRow row;
+                int64_t pid_val = 0;
+                if (p["participantId"].get(pid_val) == simdjson::SUCCESS) {
+                    row.participant_id = static_cast<int>(pid_val);
                 }
+                std::string_view sv;
+                if (p["puuid"].get(sv) == simdjson::SUCCESS) {
+                    row.puuid = std::string(sv);
+                }
+                if (p["riotIdGameName"].get(sv) == simdjson::SUCCESS) {
+                    row.game_name = std::string(sv);
+                } else if (p["summonerName"].get(sv) == simdjson::SUCCESS) {
+                    row.game_name = std::string(sv);
+                }
+                if (p["riotIdTagline"].get(sv) == simdjson::SUCCESS) {
+                    row.tag_line = std::string(sv);
+                }
+                if (p["championName"].get(sv) == simdjson::SUCCESS) {
+                    row.champion_name = std::string(sv);
+                }
+                if (p["championId"].get(pid_val) == simdjson::SUCCESS) {
+                    row.champion_id = static_cast<int>(pid_val);
+                }
+                if (p["teamId"].get(pid_val) == simdjson::SUCCESS) {
+                    row.team_id = static_cast<int>(pid_val);
+                }
+                if (p["kills"].get(pid_val) == simdjson::SUCCESS) {
+                    row.kills = static_cast<int>(pid_val);
+                }
+                if (p["deaths"].get(pid_val) == simdjson::SUCCESS) {
+                    row.deaths = static_cast<int>(pid_val);
+                }
+                if (p["assists"].get(pid_val) == simdjson::SUCCESS) {
+                    row.assists = static_cast<int>(pid_val);
+                }
+                bool b_val = false;
+                if (p["win"].get(b_val) == simdjson::SUCCESS) {
+                    row.win = b_val;
+                }
+                participants.push_back(std::move(row));
             }
         }
     } catch (...) {
-        // Fallback for minimal/malformed json
+        return false;
     }
 
     // 1. Insert into matches table
@@ -550,9 +576,45 @@ bool DatabaseManager::SaveMatch(const std::string& match_id, const std::string& 
 
     if (!success) return false;
 
-    // 2. Insert participant rows
+    // 2. Insert participant rows, resolving known player_id via PUUID or Riot ID alias
     for (const auto& p : participants) {
         std::string p_player_id = p.player_id;
+
+        if (p_player_id.empty() && !p.puuid.empty()) {
+            duckdb_prepared_statement lstmt;
+            if (duckdb_prepare(conn_, "SELECT player_id FROM dev_puuid_mappings WHERE encrypted_puuid = $1 LIMIT 1;", &lstmt) != DuckDBError) {
+                duckdb_bind_varchar(lstmt, 1, p.puuid.c_str());
+                duckdb_result lres;
+                if (duckdb_execute_prepared(lstmt, &lres) != DuckDBError && duckdb_row_count(&lres) > 0) {
+                    char* val = duckdb_value_varchar(&lres, 0, 0);
+                    if (val) {
+                        p_player_id = std::string(val);
+                        duckdb_free(val);
+                    }
+                }
+                duckdb_destroy_result(&lres);
+                duckdb_destroy_prepare(&lstmt);
+            }
+        }
+
+        if (p_player_id.empty() && !p.game_name.empty() && !p.tag_line.empty()) {
+            duckdb_prepared_statement lstmt;
+            if (duckdb_prepare(conn_, "SELECT player_id FROM player_aliases WHERE lower(game_name) = lower($1) AND lower(tag_line) = lower($2) ORDER BY last_seen DESC LIMIT 1;", &lstmt) != DuckDBError) {
+                duckdb_bind_varchar(lstmt, 1, p.game_name.c_str());
+                duckdb_bind_varchar(lstmt, 2, p.tag_line.c_str());
+                duckdb_result lres;
+                if (duckdb_execute_prepared(lstmt, &lres) != DuckDBError && duckdb_row_count(&lres) > 0) {
+                    char* val = duckdb_value_varchar(&lres, 0, 0);
+                    if (val) {
+                        p_player_id = std::string(val);
+                        duckdb_free(val);
+                    }
+                }
+                duckdb_destroy_result(&lres);
+                duckdb_destroy_prepare(&lstmt);
+            }
+        }
+
         if (p_player_id.empty() && !primary_player_id.empty() && (p.participant_id == 1)) {
             p_player_id = primary_player_id;
         }
@@ -588,20 +650,34 @@ bool DatabaseManager::SaveMatch(const std::string& match_id, const std::string& 
 
 bool DatabaseManager::SaveTimeline(const std::string& match_id, const std::string& raw_json_str) {
     std::lock_guard<std::recursive_mutex> lock(db_mutex_);
-    if (!initialized_ || !conn_) return false;
+    if (!initialized_ || !conn_ || raw_json_str.empty()) return false;
 
+    std::string actual_match_id = match_id;
     int32_t frame_interval = 0;
     try {
+        simdjson::padded_string padded(raw_json_str.data(), raw_json_str.size());
         simdjson::dom::parser parser;
         simdjson::dom::element doc;
-        if (parser.parse(raw_json_str.data(), raw_json_str.size()).get(doc) == simdjson::SUCCESS) {
-            int64_t val = 0;
-            if (doc["info"]["frameInterval"].get(val) == simdjson::SUCCESS) {
-                frame_interval = static_cast<int32_t>(val);
-            }
+        if (parser.parse(padded).get(doc) != simdjson::SUCCESS) {
+            return false;
+        }
+        if (doc["status"].error() == simdjson::SUCCESS) {
+            return false;
+        }
+        simdjson::dom::element info;
+        if (doc["info"].get(info) != simdjson::SUCCESS) {
+            return false;
+        }
+        std::string_view mid_sv;
+        if (doc["metadata"]["matchId"].get(mid_sv) == simdjson::SUCCESS && !mid_sv.empty()) {
+            actual_match_id = std::string(mid_sv);
+        }
+        int64_t val = 0;
+        if (info["frameInterval"].get(val) == simdjson::SUCCESS) {
+            frame_interval = static_cast<int32_t>(val);
         }
     } catch (...) {
-        // Fallback for minimal json
+        return false;
     }
 
     duckdb_prepared_statement stmt;
@@ -614,7 +690,7 @@ bool DatabaseManager::SaveTimeline(const std::string& match_id, const std::strin
         return false;
     }
 
-    duckdb_bind_varchar(stmt, 1, match_id.c_str());
+    duckdb_bind_varchar(stmt, 1, actual_match_id.c_str());
     duckdb_bind_int32(stmt, 2, frame_interval);
     duckdb_bind_varchar(stmt, 3, raw_json_str.c_str());
 
@@ -628,12 +704,60 @@ bool DatabaseManager::SaveTimeline(const std::string& match_id, const std::strin
     return success;
 }
 
+bool DatabaseManager::HasPlayerPuuid(const std::string& puuid) {
+    std::lock_guard<std::recursive_mutex> lock(db_mutex_);
+    if (!initialized_ || !conn_ || puuid.empty()) return false;
+
+    duckdb_prepared_statement stmt;
+    if (duckdb_prepare(conn_, "SELECT COUNT(*) FROM dev_puuid_mappings WHERE encrypted_puuid = $1;", &stmt) == DuckDBError) {
+        duckdb_destroy_prepare(&stmt);
+        return false;
+    }
+    duckdb_bind_varchar(stmt, 1, puuid.c_str());
+
+    duckdb_result res;
+    bool found = false;
+    if (duckdb_execute_prepared(stmt, &res) != DuckDBError) {
+        if (duckdb_row_count(&res) > 0) {
+            int64_t count = duckdb_value_int64(&res, 0, 0);
+            found = (count > 0);
+        }
+    }
+    duckdb_destroy_result(&res);
+    duckdb_destroy_prepare(&stmt);
+    return found;
+}
+
 bool DatabaseManager::HasMatch(const std::string& match_id) {
     std::lock_guard<std::recursive_mutex> lock(db_mutex_);
     if (!initialized_ || !conn_) return false;
 
     duckdb_prepared_statement stmt;
     if (duckdb_prepare(conn_, "SELECT COUNT(*) FROM matches WHERE match_id = $1;", &stmt) == DuckDBError) {
+        duckdb_destroy_prepare(&stmt);
+        return false;
+    }
+    duckdb_bind_varchar(stmt, 1, match_id.c_str());
+
+    duckdb_result res;
+    bool found = false;
+    if (duckdb_execute_prepared(stmt, &res) != DuckDBError) {
+        if (duckdb_row_count(&res) > 0) {
+            int64_t count = duckdb_value_int64(&res, 0, 0);
+            found = (count > 0);
+        }
+    }
+    duckdb_destroy_result(&res);
+    duckdb_destroy_prepare(&stmt);
+    return found;
+}
+
+bool DatabaseManager::HasTimeline(const std::string& match_id) {
+    std::lock_guard<std::recursive_mutex> lock(db_mutex_);
+    if (!initialized_ || !conn_) return false;
+
+    duckdb_prepared_statement stmt;
+    if (duckdb_prepare(conn_, "SELECT COUNT(*) FROM match_timelines WHERE match_id = $1;", &stmt) == DuckDBError) {
         duckdb_destroy_prepare(&stmt);
         return false;
     }
@@ -665,6 +789,72 @@ int64_t DatabaseManager::GetMatchCount() {
     }
     duckdb_destroy_result(&res);
     return count;
+}
+
+int64_t DatabaseManager::GetTimelineCount() {
+    std::lock_guard<std::recursive_mutex> lock(db_mutex_);
+    if (!initialized_ || !conn_) return 0;
+
+    duckdb_result res;
+    int64_t count = 0;
+    if (duckdb_query(conn_, "SELECT COUNT(*) FROM match_timelines;", &res) != DuckDBError) {
+        if (duckdb_row_count(&res) > 0) {
+            count = duckdb_value_int64(&res, 0, 0);
+        }
+    }
+    duckdb_destroy_result(&res);
+    return count;
+}
+
+int64_t DatabaseManager::GetMatchParticipantCount(const std::string& match_id) {
+    std::lock_guard<std::recursive_mutex> lock(db_mutex_);
+    if (!initialized_ || !conn_) return 0;
+
+    duckdb_prepared_statement stmt;
+    if (duckdb_prepare(conn_, "SELECT COUNT(*) FROM match_participants WHERE match_id = $1;", &stmt) == DuckDBError) {
+        duckdb_destroy_prepare(&stmt);
+        return 0;
+    }
+    duckdb_bind_varchar(stmt, 1, match_id.c_str());
+
+    duckdb_result res;
+    int64_t count = 0;
+    if (duckdb_execute_prepared(stmt, &res) != DuckDBError) {
+        if (duckdb_row_count(&res) > 0) {
+            count = duckdb_value_int64(&res, 0, 0);
+        }
+    }
+    duckdb_destroy_result(&res);
+    duckdb_destroy_prepare(&stmt);
+    return count;
+}
+
+std::string DatabaseManager::GetParticipantPlayerId(const std::string& match_id, int participant_id) {
+    std::lock_guard<std::recursive_mutex> lock(db_mutex_);
+    if (!initialized_ || !conn_) return "";
+
+    duckdb_prepared_statement stmt;
+    if (duckdb_prepare(conn_, "SELECT player_id FROM match_participants WHERE match_id = $1 AND participant_id = $2;", &stmt) == DuckDBError) {
+        duckdb_destroy_prepare(&stmt);
+        return "";
+    }
+    duckdb_bind_varchar(stmt, 1, match_id.c_str());
+    duckdb_bind_int32(stmt, 2, participant_id);
+
+    duckdb_result res;
+    std::string pid = "";
+    if (duckdb_execute_prepared(stmt, &res) != DuckDBError) {
+        if (duckdb_row_count(&res) > 0) {
+            char* val = duckdb_value_varchar(&res, 0, 0);
+            if (val) {
+                pid = std::string(val);
+                duckdb_free(val);
+            }
+        }
+    }
+    duckdb_destroy_result(&res);
+    duckdb_destroy_prepare(&stmt);
+    return pid;
 }
 
 int64_t DatabaseManager::GetPlayerCount() {
