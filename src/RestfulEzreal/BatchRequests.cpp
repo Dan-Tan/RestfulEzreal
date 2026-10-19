@@ -39,6 +39,13 @@ namespace restfulEz {
         };
     }
 
+    std::function<bool(const std::string&)> ValuePool::SkipPlayersWithMatchesInDB(int min_matches) {
+        return [min_matches](const std::string& puuid) -> bool {
+            if (!DatabaseManager::GetInstance().IsInitialized()) return true;
+            return !DatabaseManager::GetInstance().HasMatchesForPlayerPuuid(puuid, min_matches);
+        };
+    }
+
     std::shared_ptr<ValuePool> ValuePool::FromDelimitedString(const std::string& input, char delimiter, bool deduplicate) {
         auto pool = std::make_shared<ValuePool>(deduplicate);
         std::stringstream ss(input);
@@ -750,6 +757,26 @@ namespace restfulEz {
                                             child->tracker->state.store(NodeExecState::READY);
                                         }
                                         this->parent_requests->insert(child);
+                                    } else {
+                                        bool all_filtered_by_db = true;
+                                        bool any_empty = false;
+                                        for (const auto& p : child->_node->unsent_request->param_pools) {
+                                            if (!p || p->empty()) {
+                                                any_empty = true;
+                                                if (!p || p->filtered_out_count() == 0) {
+                                                    all_filtered_by_db = false;
+                                                }
+                                            }
+                                        }
+                                        if (any_empty && all_filtered_by_db) {
+                                            child->sent = true;
+                                            child->in_progress = false;
+                                            child->completed = true;
+                                            if (child->tracker) {
+                                                child->tracker->set_total(0);
+                                                child->tracker->state.store(NodeExecState::COMPLETED);
+                                            }
+                                        }
                                     }
                                 } catch (const std::exception& err) {
                                     std::cerr << "[BatchRequest] Error preparing child pools: " << err.what() << std::endl;

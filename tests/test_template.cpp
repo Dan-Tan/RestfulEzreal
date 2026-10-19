@@ -45,8 +45,8 @@ int main() {
         assert(node0->get_endpoint() == 0);
         assert(node0->get_endpoint_method() == 1);
         assert(!node0->get_zip_mode());
-        assert(node0->get_window_position().x == 165.0f);
-        assert(node0->get_window_position().y == 70.0f);
+        assert(node0->get_window_position().x == 200.0f);
+        assert(node0->get_window_position().y == 65.0f);
         assert(node0->get_param_count() == 3);
         assert(node0->get_param_name(0) == "Routing");
         assert(node0->get_param_value(0) == "ASIA");
@@ -67,8 +67,8 @@ int main() {
         assert(node1->get_game() == 1);
         assert(node1->get_endpoint() == 6);
         assert(node1->get_endpoint_method() == 2);
-        assert(node1->get_window_position().x == 435.0f);
-        assert(node1->get_window_position().y == 70.0f);
+        assert(node1->get_window_position().x == 500.0f);
+        assert(node1->get_window_position().y == 235.0f);
         assert(node1->get_param_count() == 2);
         assert(node1->get_param_name(0) == "Routing");
         assert(node1->get_param_value(0) == "ASIA");
@@ -100,8 +100,8 @@ int main() {
         assert(node2->get_game() == 1);
         assert(node2->get_endpoint() == 6);
         assert(node2->get_endpoint_method() == 0);
-        assert(node2->get_window_position().x == 705.0f);
-        assert(node2->get_window_position().y == 50.0f);
+        assert(node2->get_window_position().x == 270.0f);
+        assert(node2->get_window_position().y == 430.0f);
         assert(node2->is_param_linked(1));
         assert(node2->is_param_iterative(1));
         assert(node2->is_param_deduplicate(1));
@@ -118,8 +118,8 @@ int main() {
         assert(node3->get_game() == 1);
         assert(node3->get_endpoint() == 6);
         assert(node3->get_endpoint_method() == 1);
-        assert(node3->get_window_position().x == 705.0f);
-        assert(node3->get_window_position().y == 270.0f);
+        assert(node3->get_window_position().x == 740.0f);
+        assert(node3->get_window_position().y == 430.0f);
         assert(node3->is_param_linked(1));
         assert(node3->is_param_iterative(1));
         assert(node3->is_param_deduplicate(1));
@@ -163,14 +163,14 @@ int main() {
         auto node1 = bf.get_forms()[1];
         auto node2 = bf.get_forms()[2];
         assert(node0 != nullptr);
-        assert(node0->get_window_position().x == 165.0f);
-        assert(node0->get_window_position().y == 70.0f);
+        assert(node0->get_window_position().x == 200.0f);
+        assert(node0->get_window_position().y == 65.0f);
         assert(node1 != nullptr);
-        assert(node1->get_window_position().x == 435.0f);
-        assert(node1->get_window_position().y == 70.0f);
+        assert(node1->get_window_position().x == 500.0f);
+        assert(node1->get_window_position().y == 140.0f);
         assert(node2 != nullptr);
-        assert(node2->get_window_position().x == 705.0f);
-        assert(node2->get_window_position().y == 70.0f);
+        assert(node2->get_window_position().x == 270.0f);
+        assert(node2->get_window_position().y == 380.0f);
 
         // Node 3: Account-v1 By Riot ID in ZIP mode
         auto node3 = bf.get_forms()[3];
@@ -180,8 +180,8 @@ int main() {
         assert(node3->get_endpoint() == 0);
         assert(node3->get_endpoint_method() == 1);
         assert(node3->get_zip_mode() == true);
-        assert(node3->get_window_position().x == 705.0f);
-        assert(node3->get_window_position().y == 290.0f);
+        assert(node3->get_window_position().x == 740.0f);
+        assert(node3->get_window_position().y == 410.0f);
         assert(node3->get_param_count() == 3);
 
         // Param 1: Game Name (linked to Match-v5 Details Node 2)
@@ -385,6 +385,8 @@ int main() {
         assert(bf_chal.get_forms()[0]->get_endpoint_method() == 0);
         assert(bf_chal.get_forms()[1]->is_param_skip_db(1) == true);
         assert(bf_chal.get_forms()[1]->get_iter_limit_val(1) == 25);
+        assert(bf_chal.get_forms()[2]->is_param_skip_db(1) == true);
+        assert(bf_chal.get_forms()[2]->get_iter_limit_val(1) == 25);
         assert(bf_chal.get_forms()[3]->is_param_skip_db(1) == true);
         assert(bf_chal.get_forms()[4]->is_param_skip_db(1) == true);
 
@@ -472,6 +474,192 @@ int main() {
         assert(bf.get_forms().empty());
 
         std::cout << "  [PASS] Graceful error handling for corrupt and missing files." << std::endl;
+    }
+
+    // =========================================================================
+    // TEST 7: Endpoint Routing & Parameter Sanitization / Validation
+    // =========================================================================
+    {
+        std::cout << "\n[Test 7] Endpoint Routing & Parameter Sanitization / Validation..." << std::endl;
+
+        // 7a. riot-cpp str_to_routing_for_indicator & prefix/whitespace handling
+        {
+            // Prefix false-positives rejected
+            assert(!riotcpp::args::valid_regional("A"));
+            assert(!riotcpp::args::valid_regional("AS"));
+            assert(!riotcpp::args::valid_platform("OC"));
+            assert(!riotcpp::args::valid_platform("NA"));
+            assert(riotcpp::args::valid_val_platform("NA"));
+
+            // Whitespace and lowercase accepted
+            assert(riotcpp::args::valid_regional("  asia  "));
+            assert(riotcpp::args::valid_platform(" oc1\t"));
+            assert(riotcpp::args::valid_tier("diamond"));
+            assert(riotcpp::args::valid_tier("EMERALD"));
+            assert(!riotcpp::args::valid_tier("I"));
+
+            // Platform passed to Regional indicator throws with helpful mapped suggestion
+            bool threw_oc1_on_reg = false;
+            try {
+                riotcpp::args::str_to_routing_for_indicator("OC1", REGIONAL_INDICATOR);
+            } catch (const std::invalid_argument& ex) {
+                threw_oc1_on_reg = true;
+                std::string msg = ex.what();
+                assert(msg.find("SEA") != std::string::npos);
+            }
+            assert(threw_oc1_on_reg);
+
+            // Regional passed to Platform indicator throws
+            bool threw_asia_on_plat = false;
+            try {
+                riotcpp::args::str_to_routing_for_indicator("ASIA", PLATFORM_INDICATOR);
+            } catch (const std::invalid_argument& ex) {
+                threw_asia_on_plat = true;
+                std::string msg = ex.what();
+                assert(msg.find("regional cluster") != std::string::npos);
+            }
+            assert(threw_asia_on_plat);
+
+            // Valorant KR resolves to VAL_PLATFORM_INDICATOR (2)
+            auto val_kr = riotcpp::args::str_to_routing_for_indicator("KR", VAL_PLATFORM_INDICATOR);
+            assert(val_kr.indicator == VAL_PLATFORM_INDICATOR);
+            assert(riotcpp::args::routing_to_host_str(val_kr) == "kr");
+        }
+
+        // 7b. LinkedForm / BaseForm validation: Platform endpoint (League-v4 Challenger)
+        {
+            auto chal_form = LinkedInterface::make_linked(1, 3, 0); // League-v4 Challenger
+            assert(chal_form->get_expected_routing_indicator() == PLATFORM_INDICATOR);
+            chal_form->set_param_value(1, "RANKED_SOLO_5x5");
+
+            // Passing regional cluster ASIA to Platform endpoint must fail readiness
+            chal_form->set_param_value(0, "ASIA");
+            chal_form->refresh_display();
+            assert(!chal_form->check_ready());
+
+            std::string err, fix;
+            assert(!chal_form->validate_routing(&err, &fix));
+            assert(!err.empty());
+            assert(fix == "KR");
+
+            // Passing valid platform OC1 (even lowercase with spaces) succeeds and sanitizes
+            chal_form->set_param_value(0, "  oc1 ");
+            chal_form->set_param_value(1, " ranked_solo_5x5 ");
+            chal_form->refresh_display();
+            assert(chal_form->check_ready());
+            chal_form->construct_base();
+            auto& req = chal_form->get_base_request()->_node->unsent_request;
+            assert(std::string(req->params[0].param) == "OC1");
+            assert(std::string(req->params[1].param) == "RANKED_SOLO_5x5");
+
+            // Invalid Queue enum rejected
+            chal_form->set_param_value(1, "INVALID_QUEUE");
+            chal_form->refresh_display();
+            assert(!chal_form->check_ready());
+        }
+
+        // 7c. LinkedForm / BaseForm validation: Regional endpoint (Match-v5 & Account-v1)
+        {
+            auto match_form = LinkedInterface::make_linked(1, 6, 0); // Match-v5 By Match ID
+            assert(match_form->get_expected_routing_indicator() == REGIONAL_INDICATOR);
+            match_form->set_param_value(1, "OC1_123456");
+
+            // Passing platform shard OC1 to Match-v5 must fail readiness and suggest SEA
+            match_form->set_param_value(0, "OC1");
+            match_form->refresh_display();
+            assert(!match_form->check_ready());
+
+            std::string err, fix;
+            assert(!match_form->validate_routing(&err, &fix));
+            assert(err.find("SEA") != std::string::npos);
+            assert(fix == "SEA");
+
+            // Applying suggested fix SEA makes form ready
+            match_form->set_param_value(0, fix);
+            match_form->refresh_display();
+            assert(match_form->check_ready());
+        }
+
+        // 7d. QuickFillRootParameters automatic platform <-> region resolution on mixed pipelines (including KR1 alias)
+        {
+            BatchForm bf_mixed;
+            auto& tm = TemplateManager::GetInstance();
+            tm.LoadTemplateFromString(tm.GetStarterChallengerDatabaseJson(), bf_mixed);
+            // Passing "KR1" (or "kr1") normalizes Platform Node 0 to "KR" and Regional Nodes 1..4 to "ASIA"
+            tm.QuickFillRootParameters(bf_mixed, " kr1 ", "", "");
+            assert(bf_mixed.get_forms()[0]->get_param_value(0) == "KR");
+            assert(bf_mixed.get_forms()[1]->get_param_value(0) == "ASIA");
+            assert(bf_mixed.get_forms()[2]->get_param_value(0) == "ASIA");
+            assert(bf_mixed.get_forms()[3]->get_param_value(0) == "ASIA");
+            assert(bf_mixed.get_forms()[4]->get_param_value(0) == "ASIA");
+            for (const auto& f : bf_mixed.get_forms()) {
+                assert(f->check_ready());
+            }
+
+            // Verify Node 2 links directly to Node 0 and Node 4 links directly to Node 2
+            assert(bf_mixed.get_forms()[2]->get_parent_for_index(1) == bf_mixed.get_forms()[0]);
+            assert(bf_mixed.get_forms()[2]->is_param_iterative(1));
+            assert(bf_mixed.get_forms()[4]->get_parent_for_index(1) == bf_mixed.get_forms()[2]);
+            assert(bf_mixed.get_forms()[4]->is_param_iterative(1));
+        }
+
+        // 7e. Challenger pipeline execution when Node 1 (Account-v1) skips 100% of players already in DB
+        {
+            BatchForm bf_chal;
+            auto& tm = TemplateManager::GetInstance();
+            tm.LoadTemplateFromString(tm.GetStarterChallengerDatabaseJson(), bf_chal);
+            for (auto& f : bf_chal.get_forms()) f->construct_base();
+            for (auto& f : bf_chal.get_forms()) f->link_final_requests();
+
+            // Simulate all PUUIDs already in DB on Node 1 by setting a filter that rejects all PUUIDs
+            auto& req1 = bf_chal.get_forms()[1]->get_base_request()->_node->unsent_request;
+            req1->get_or_create_pool(1)->set_filter([](const std::string&) { return false; });
+            // Simulate all matches/timelines accepted on Nodes 3 & 4
+            auto& req3 = bf_chal.get_forms()[3]->get_base_request()->_node->unsent_request;
+            req3->get_or_create_pool(1)->set_filter([](const std::string&) { return true; });
+            auto& req4 = bf_chal.get_forms()[4]->get_base_request()->_node->unsent_request;
+            req4->get_or_create_pool(1)->set_filter([](const std::string&) { return true; });
+
+            auto batch = std::make_shared<BatchRequest>(
+                std::vector<std::shared_ptr<RequestNode>>{bf_chal.get_forms()[0]->get_base_request()}
+            );
+
+            // Step 1: Node 0 (League-v4 Challenger) dispatches
+            request r0 = batch->get_next();
+            assert(r0._game == 1 && r0._endpoint == 3 && r0._endpoint_method == 0);
+            std::string chal_json = R"({"entries":[{"puuid":"puuid-alpha"}]})";
+            batch->insert_result(std::make_unique<std::vector<char>>(chal_json.begin(), chal_json.end()));
+
+            // Node 1 had 100% of items skipped by DB filter -> must be marked COMPLETED (0/0), not stuck in WAITING
+            assert(bf_chal.get_forms()[1]->get_tracker()->state.load() == NodeExecState::COMPLETED);
+            assert(bf_chal.get_forms()[1]->get_tracker()->items_total.load() == 0);
+
+            // Step 2: Node 2 (Match-v5 By Puuid) still executes because it links to Node 0 directly!
+            request r2 = batch->get_next();
+            assert(r2._game == 1 && r2._endpoint == 6 && r2._endpoint_method == 2);
+            assert(std::string(r2.params[1].param) == "puuid-alpha");
+            std::string mlist_json = R"(["KR_999"])";
+            batch->insert_result(std::make_unique<std::vector<char>>(mlist_json.begin(), mlist_json.end()));
+
+            // Step 3 & 4: Node 3 (Match-v5 Details) and Node 4 (Match-v5 Timeline) both execute
+            request r3 = batch->get_next();
+            assert(r3._game == 1 && r3._endpoint == 6 && r3._endpoint_method == 0);
+            std::string mdet_json = R"({"metadata":{"matchId":"KR_999"},"info":{}})";
+            batch->insert_result(std::make_unique<std::vector<char>>(mdet_json.begin(), mdet_json.end()));
+
+            request r4 = batch->get_next();
+            assert(r4._game == 1 && r4._endpoint == 6 && r4._endpoint_method == 1);
+            std::string mtime_json = R"({"metadata":{"matchId":"KR_999"},"info":{"frameInterval":60000}})";
+            batch->insert_result(std::make_unique<std::vector<char>>(mtime_json.begin(), mtime_json.end()));
+
+            request r_done = batch->get_next();
+            assert(r_done.same_endpoint(BatchRequest::FINISHED));
+            for (const auto& f : bf_chal.get_forms()) {
+                assert(f->get_tracker()->state.load() == NodeExecState::COMPLETED);
+            }
+        }
+
+        std::cout << "  [PASS] Endpoint routing & parameter sanitization verified across riot-cpp and UI forms." << std::endl;
     }
 
     ImGui::DestroyContext(imgui_ctx);

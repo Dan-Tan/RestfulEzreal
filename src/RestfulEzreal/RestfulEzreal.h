@@ -81,6 +81,14 @@ namespace restfulEz {
             void render_advanced_requests();
             void render_client_config();
             void render_json();
+            void render_request_history();
+            void render_tab_workspace_overview();
+            void render_tab_duckdb_analytics();
+            void render_tab_sql_export();
+            void refresh_duckdb_analytics();
+            void execute_custom_sql();
+            void export_current_query_csv();
+            void export_table_csv(const std::string& table_name);
             void render_rate_status();
 
             // Client Config page state
@@ -99,6 +107,21 @@ namespace restfulEz {
             std::vector<std::pair<std::string, std::string>> _cached_file_list; // {rel_path, abs_path}
             int _history_last_refresh_frame = -100;
             void refresh_history_files();
+
+            // SQL Query & DuckDB Explorer State
+            char _sql_query_input[4096] = "SELECT champion_name, COUNT(*) AS picks, SUM(CASE WHEN win THEN 1 ELSE 0 END) AS wins, ROUND(100.0 * SUM(CASE WHEN win THEN 1 ELSE 0 END) / COUNT(*), 1) AS winrate_pct, ROUND(AVG(kills), 1) AS avg_k, ROUND(AVG(deaths), 1) AS avg_d, ROUND(AVG(assists), 1) AS avg_a FROM match_participants GROUP BY champion_name ORDER BY picks DESC LIMIT 20;";
+            QueryResult _current_query_result;
+            std::string _query_status_message;
+            bool _query_has_error = false;
+            std::string _export_status_message;
+            int _export_table_selected = 0;
+            TableCounts _cached_table_counts;
+            QueryResult _cached_champion_stats;
+            QueryResult _cached_player_stats;
+            QueryResult _cached_timeline_stats;
+            QueryResult _cached_event_stats;
+            int _analytics_last_refresh_frame = -100;
+            std::string _backfill_status_message;
 
             // Client State collapse toggle
             bool _client_state_collapsed = true;

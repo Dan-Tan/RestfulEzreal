@@ -145,6 +145,7 @@ namespace restfulEz {
         std::unordered_set<std::string> seen_;
         bool deduplicate_ = false;
         std::size_t max_capacity_ = 0; // 0 = unlimited
+        std::size_t filtered_out_count_ = 0;
         std::function<bool(const std::string&)> filter_predicate_ = nullptr;
 
     public:
@@ -182,11 +183,14 @@ namespace restfulEz {
         void set_filter(std::function<bool(const std::string&)> predicate) {
             filter_predicate_ = std::move(predicate);
         }
+        bool has_filter() const { return static_cast<bool>(filter_predicate_); }
+        std::size_t filtered_out_count() const { return filtered_out_count_; }
 
         // Built-in DuckDB pre-filters to avoid redundant HTTP calls
         static std::function<bool(const std::string&)> SkipExistingPlayersInDB();
         static std::function<bool(const std::string&)> SkipExistingMatchesInDB();
         static std::function<bool(const std::string&)> SkipExistingTimelinesInDB();
+        static std::function<bool(const std::string&)> SkipPlayersWithMatchesInDB(int min_matches = 1);
 
         // Construct a pool from a delimiter-separated string (e.g. "Faker, Chovy, ShowMaker")
         static std::shared_ptr<ValuePool> FromDelimitedString(const std::string& input, char delimiter = ',', bool deduplicate = true);
@@ -199,7 +203,10 @@ namespace restfulEz {
                 if (seen_.find(s) != seen_.end()) return false;
             }
             if (filter_predicate_ && !s.empty()) {
-                if (!filter_predicate_(s)) return false;
+                if (!filter_predicate_(s)) {
+                    filtered_out_count_++;
+                    return false;
+                }
             }
             if (deduplicate_) {
                 seen_.insert(s);
@@ -225,6 +232,7 @@ namespace restfulEz {
         void clearValues() {
             values_.clear();
             seen_.clear();
+            filtered_out_count_ = 0;
         }
 
         std::size_t size() const { return values_.size(); }

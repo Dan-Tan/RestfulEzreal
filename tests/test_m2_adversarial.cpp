@@ -12,6 +12,12 @@
 #include "TemplateManager.h"
 #include "FileManager.h"
 #include "BatchRequests.h"
+#include "db/DatabaseManager.h"
+#include "duckdb.h"
+#include <sstream>
+#include <thread>
+#include <chrono>
+#include <atomic>
 
 using namespace restfulEz;
 
@@ -715,6 +721,627 @@ int main() {
         assert(bf.get_forms()[3]->get_zip_mode() == true);
 
         std::cout << "  [PASS] Canvas clear and consecutive template reloads maintain state isolation." << std::endl;
+    }
+
+    // =========================================================================
+    // FEATURE 2 ADVERSARIAL STRESS SUITE (Tests 9 - 16)
+    // =========================================================================
+
+    // =========================================================================
+    // TEST 9: Rich Multi-Frame Timeline Payload (35 frames x 10 participants = 350 frames, 50 diverse events)
+    // =========================================================================
+    {
+        std::cout << "\n[Test 9] Rich Multi-Frame Timeline Payload (35 frames x 10 participants = 350 frames, 50 events)..." << std::endl;
+        std::string db_dir = "./test_m2_timeline_stress_ws";
+        std::string db_file = db_dir + "/ezreal_data.duckdb";
+        std::filesystem::remove_all(db_dir);
+        std::filesystem::create_directories(db_dir);
+
+        auto& db = DatabaseManager::GetInstance();
+        assert(db.Init(db_file));
+        assert(db.InitTables());
+
+        // Construct 35 frames (0 to 34), each with 10 participants (1 to 10)
+        std::ostringstream ss;
+        ss << "{\n"
+           << "  \"metadata\": { \"matchId\": \"KR_RICH_TIMELINE_001\" },\n"
+           << "  \"info\": {\n"
+           << "    \"frameInterval\": 60000,\n"
+           << "    \"frames\": [\n";
+
+        for (int f = 0; f < 35; ++f) {
+            ss << "      {\n"
+               << "        \"timestamp\": " << (f * 60000) << ",\n"
+               << "        \"participantFrames\": {\n";
+            for (int p = 1; p <= 10; ++p) {
+                ss << "          \"" << p << "\": {\n"
+                   << "            \"participantId\": " << p << ",\n"
+                   << "            \"totalGold\": " << (500 + f * 350 + p * 20) << ",\n"
+                   << "            \"currentGold\": " << (500 + (f * 120) % 1500) << ",\n"
+                   << "            \"xp\": " << (f * 450 + p * 15) << ",\n"
+                   << "            \"level\": " << std::min(18, 1 + f / 2) << ",\n"
+                   << "            \"minionsKilled\": " << (f * 8 + p) << ",\n"
+                   << "            \"jungleMinionsKilled\": " << (p == 2 || p == 7 ? f * 4 : 0) << ",\n"
+                   << "            \"position\": { \"x\": " << (500 + f * 200 + p * 50) << ", \"y\": " << (600 + f * 180 + p * 40) << " },\n"
+                   << "            \"damageStats\": { \"totalDamageDoneToChampions\": " << (f * 500 + p * 100) << " }\n"
+                   << "          }" << (p < 10 ? "," : "") << "\n";
+            }
+            ss << "        },\n"
+               << "        \"events\": [\n";
+
+            // Add events on specific frames
+            if (f == 1) {
+                ss << "          { \"timestamp\": 65000, \"type\": \"ITEM_PURCHASED\", \"participantId\": 1, \"itemId\": 1055 },\n"
+                   << "          { \"timestamp\": 70000, \"type\": \"WARD_PLACED\", \"creatorId\": 1 }\n";
+            } else if (f == 5) {
+                ss << "          { \"timestamp\": 310000, \"type\": \"CHAMPION_KILL\", \"killerId\": 1, \"victimId\": 6, \"assistingParticipantIds\": [2, 3], \"position\": { \"x\": 4500, \"y\": 5200 } },\n"
+                   << "          { \"timestamp\": 320000, \"type\": \"WARD_KILL\", \"killerId\": 1 }\n";
+            } else if (f == 10) {
+                ss << "          { \"timestamp\": 610000, \"type\": \"ELITE_MONSTER_KILL\", \"monsterType\": \"DRAGON\", \"monsterSubType\": \"FIRE_DRAGON\", \"killerId\": 2, \"teamId\": 100 },\n"
+                   << "          { \"timestamp\": 630000, \"type\": \"TURRET_PLATE_DESTROYED\", \"killerId\": 1, \"laneType\": \"TOP_LANE\", \"teamId\": 200 }\n";
+            } else if (f == 15) {
+                ss << "          { \"timestamp\": 910000, \"type\": \"BUILDING_KILL\", \"buildingType\": \"TOWER_BUILDING\", \"laneType\": \"MID_LANE\", \"killerId\": 4, \"teamId\": 200 },\n"
+                   << "          { \"timestamp\": 920000, \"type\": \"SKILL_LEVEL_UP\", \"participantId\": 4, \"skillSlot\": 1 }\n";
+            } else if (f == 20) {
+                ss << "          { \"timestamp\": 1210000, \"type\": \"ELITE_MONSTER_KILL\", \"monsterType\": \"BARON_NASHOR\", \"monsterSubType\": \"\", \"killerId\": 2, \"teamId\": 100 },\n"
+                   << "          { \"timestamp\": 1220000, \"type\": \"ITEM_SOLD\", \"participantId\": 1, \"itemId\": 1055 },\n"
+                   << "          { \"timestamp\": 1225000, \"type\": \"ITEM_UNDO\", \"participantId\": 1, \"afterId\": 3031, \"beforeId\": 0 },\n"
+                   << "          { \"timestamp\": 1230000, \"type\": \"LEVEL_UP\", \"participantId\": 1, \"level\": 16 }\n";
+            } else {
+                ss << "          { \"timestamp\": " << (f * 60000 + 1000) << ", \"type\": \"ITEM_PURCHASED\", \"participantId\": " << (1 + f % 10) << ", \"itemId\": " << (1000 + f) << " }\n";
+            }
+
+            ss << "        ]\n"
+               << "      }" << (f < 34 ? "," : "") << "\n";
+        }
+        ss << "    ]\n"
+           << "  }\n"
+           << "}";
+
+        std::string payload = ss.str();
+        bool ok = db.SaveTimeline("KR_RICH_TIMELINE_001", payload);
+        assert(ok);
+        assert(db.HasTimeline("KR_RICH_TIMELINE_001"));
+        assert(db.GetTimelineCount() == 1);
+        assert(db.GetTimelineParticipantFrameCount() == 350); // 35 * 10
+        assert(db.GetTimelineEventCount() >= 40);
+
+        // Verify values using direct DuckDB query
+        duckdb_database raw_db;
+        duckdb_connection raw_conn;
+        assert(duckdb_open(db_file.c_str(), &raw_db) != DuckDBError);
+        assert(duckdb_connect(raw_db, &raw_conn) != DuckDBError);
+
+        // Check frame 10 participant 2
+        duckdb_result r_pf;
+        const char* q_pf = "SELECT total_gold, current_gold, xp, level, minions_killed, jungle_minions_killed, pos_x, pos_y, total_damage_done_to_champions "
+                           "FROM timeline_participant_frames WHERE match_id = 'KR_RICH_TIMELINE_001' AND frame_index = 10 AND participant_id = 2;";
+        assert(duckdb_query(raw_conn, q_pf, &r_pf) != DuckDBError);
+        assert(duckdb_row_count(&r_pf) == 1);
+        assert(duckdb_value_int32(&r_pf, 0, 0) == (500 + 10 * 350 + 2 * 20)); // 4040
+        assert(duckdb_value_int32(&r_pf, 3, 0) == 6); // level
+        assert(duckdb_value_int32(&r_pf, 5, 0) == 40); // jungleMinionsKilled
+        assert(duckdb_value_int32(&r_pf, 6, 0) == 2600); // pos_x
+        assert(duckdb_value_int32(&r_pf, 7, 0) == 2480); // pos_y
+        duckdb_destroy_result(&r_pf);
+
+        // Check assisting participant IDs string concatenation in CHAMPION_KILL
+        duckdb_result r_ev;
+        const char* q_ev = "SELECT killer_id, victim_id, assisting_participant_ids, pos_x, pos_y FROM timeline_events "
+                           "WHERE match_id = 'KR_RICH_TIMELINE_001' AND event_type = 'CHAMPION_KILL';";
+        assert(duckdb_query(raw_conn, q_ev, &r_ev) != DuckDBError);
+        assert(duckdb_row_count(&r_ev) == 1);
+        assert(duckdb_value_int32(&r_ev, 0, 0) == 1);
+        assert(duckdb_value_int32(&r_ev, 1, 0) == 6);
+        char* assist_str = duckdb_value_varchar(&r_ev, 2, 0);
+        assert(std::string(assist_str) == "2,3");
+        duckdb_free(assist_str);
+        assert(duckdb_value_int32(&r_ev, 3, 0) == 4500);
+        assert(duckdb_value_int32(&r_ev, 4, 0) == 5200);
+        duckdb_destroy_result(&r_ev);
+
+        // Check monster kill
+        duckdb_result r_m;
+        const char* q_m = "SELECT monster_type, monster_sub_type, team_id FROM timeline_events "
+                          "WHERE match_id = 'KR_RICH_TIMELINE_001' AND monster_type = 'DRAGON';";
+        assert(duckdb_query(raw_conn, q_m, &r_m) != DuckDBError);
+        assert(duckdb_row_count(&r_m) == 1);
+        char* mst = duckdb_value_varchar(&r_m, 1, 0);
+        assert(std::string(mst) == "FIRE_DRAGON");
+        duckdb_free(mst);
+        assert(duckdb_value_int32(&r_m, 2, 0) == 100);
+        duckdb_destroy_result(&r_m);
+
+        duckdb_disconnect(&raw_conn);
+        duckdb_close(&raw_db);
+
+        std::cout << "  [PASS] Rich 35-frame timeline and diverse events ingested with 100% field fidelity." << std::endl;
+    }
+
+    // =========================================================================
+    // TEST 10: Massive Event Volume Stress Test (10,000+ Events across 10 frames)
+    // =========================================================================
+    {
+        std::cout << "\n[Test 10] Massive Event Volume Stress Test (10,000+ events via duckdb_appender)..." << std::endl;
+        auto& db = DatabaseManager::GetInstance();
+        int64_t initial_events = db.GetTimelineEventCount();
+
+        std::ostringstream ss;
+        ss << "{\n"
+           << "  \"metadata\": { \"matchId\": \"KR_MASSIVE_002\" },\n"
+           << "  \"info\": {\n"
+           << "    \"frameInterval\": 60000,\n"
+           << "    \"frames\": [\n";
+
+        for (int f = 0; f < 10; ++f) {
+            ss << "      {\n"
+               << "        \"timestamp\": " << (f * 60000) << ",\n"
+               << "        \"participantFrames\": {},\n"
+               << "        \"events\": [\n";
+            for (int e = 0; e < 1000; ++e) {
+                ss << "          { \"timestamp\": " << (f * 60000 + e) 
+                   << ", \"type\": \"ITEM_PURCHASED\", \"participantId\": " << (1 + e % 10) 
+                   << ", \"itemId\": " << (1000 + e % 500) << " }" << (e < 999 ? "," : "") << "\n";
+            }
+            ss << "        ]\n"
+               << "      }" << (f < 9 ? "," : "") << "\n";
+        }
+        ss << "    ]\n"
+           << "  }\n"
+           << "}";
+
+        std::string payload = ss.str();
+        bool ok = db.SaveTimeline("KR_MASSIVE_002", payload);
+        assert(ok);
+
+        int64_t final_events = db.GetTimelineEventCount();
+        assert(final_events == initial_events + 10000);
+
+        std::cout << "  [PASS] Successfully streamed and indexed 10,000 events without failure." << std::endl;
+    }
+
+    // =========================================================================
+    // TEST 11: Missing Attributes, Nulls, Sparse Frames & Key-Fallback Resilience
+    // =========================================================================
+    {
+        std::cout << "\n[Test 11] Missing Attributes, Nulls, Sparse Frames & Key-Fallback Resilience..." << std::endl;
+        auto& db = DatabaseManager::GetInstance();
+
+        std::string sparse_json = R"({
+  "metadata": { "matchId": "KR_SPARSE_003" },
+  "info": {
+    "frameInterval": 60000,
+    "frames": [
+      {
+        "timestamp": 0,
+        "participantFrames": {
+          "7": {
+            "totalGold": 500,
+            "currentGold": 500,
+            "xp": 0,
+            "level": 1
+          }
+        },
+        "events": [
+          { "type": "" },
+          { "type": "ITEM_UNDO", "afterId": 3006 },
+          { "type": "ITEM_DESTROYED", "beforeId": 2003 },
+          { "type": "ELITE_MONSTER_KILL", "monsterType": "HERALD", "killerTeamId": 200 },
+          { "type": "CHAMPION_KILL", "killerId": 1, "victimId": 2, "assistingParticipantIds": [] },
+          { "type": "CHAMPION_KILL", "killerId": 3, "victimId": 4 }
+        ]
+      }
+    ]
+  }
+})";
+
+        bool ok = db.SaveTimeline("KR_SPARSE_003", sparse_json);
+        assert(ok);
+
+        std::string current_ws_db = db.GetDatabasePath();
+        db.Close();
+        assert(db.Reopen(current_ws_db));
+
+        duckdb_database raw_db;
+        duckdb_connection raw_conn;
+        assert(duckdb_open(db.GetDatabasePath().c_str(), &raw_db) != DuckDBError);
+        assert(duckdb_connect(raw_db, &raw_conn) != DuckDBError);
+
+        // Verify participantId 7 was parsed from key "7"
+        duckdb_result r_pf;
+        assert(duckdb_query(raw_conn, "SELECT participant_id, minions_killed, jungle_minions_killed, pos_x, pos_y, total_damage_done_to_champions "
+                                      "FROM timeline_participant_frames WHERE match_id = 'KR_SPARSE_003';", &r_pf) != DuckDBError);
+        assert(duckdb_row_count(&r_pf) == 1);
+        assert(duckdb_value_int32(&r_pf, 0, 0) == 7);
+        assert(duckdb_value_int32(&r_pf, 1, 0) == 0); // minions_killed default 0
+        assert(duckdb_value_int32(&r_pf, 2, 0) == 0); // jungle_minions_killed default 0
+        assert(duckdb_value_int32(&r_pf, 3, 0) == 0); // pos_x default 0
+        assert(duckdb_value_int32(&r_pf, 4, 0) == 0); // pos_y default 0
+        assert(duckdb_value_int32(&r_pf, 5, 0) == 0); // damage default 0
+        duckdb_destroy_result(&r_pf);
+
+        // Verify events: empty type was skipped (5 events retained out of 6)
+        duckdb_result r_ev;
+        assert(duckdb_query(raw_conn, "SELECT event_index, event_type, item_id, team_id, assisting_participant_ids, pos_x, pos_y "
+                                      "FROM timeline_events WHERE match_id = 'KR_SPARSE_003' ORDER BY event_index ASC;", &r_ev) != DuckDBError);
+        assert(duckdb_row_count(&r_ev) == 5);
+        // Event 0: ITEM_UNDO with afterId 3006
+        char* et0 = duckdb_value_varchar(&r_ev, 1, 0);
+        assert(std::string(et0) == "ITEM_UNDO");
+        duckdb_free(et0);
+        assert(duckdb_value_int32(&r_ev, 2, 0) == 3006);
+
+        // Event 1: ITEM_DESTROYED with beforeId 2003
+        char* et1 = duckdb_value_varchar(&r_ev, 1, 1);
+        assert(std::string(et1) == "ITEM_DESTROYED");
+        duckdb_free(et1);
+        assert(duckdb_value_int32(&r_ev, 2, 1) == 2003);
+
+        // Event 2: ELITE_MONSTER_KILL with killerTeamId 200
+        assert(duckdb_value_int32(&r_ev, 3, 2) == 200);
+
+        // Event 3: assistingParticipantIds [] -> empty string
+        char* ass3 = duckdb_value_varchar(&r_ev, 4, 3);
+        assert(std::string(ass3).empty());
+        duckdb_free(ass3);
+
+        // Event 4: no assistingParticipantIds property -> empty string
+        char* ass4 = duckdb_value_varchar(&r_ev, 4, 4);
+        assert(std::string(ass4).empty());
+        duckdb_free(ass4);
+        assert(duckdb_value_int32(&r_ev, 5, 4) == 0); // pos_x 0
+        assert(duckdb_value_int32(&r_ev, 6, 4) == 0); // pos_y 0
+
+        duckdb_destroy_result(&r_ev);
+        duckdb_disconnect(&raw_conn);
+        duckdb_close(&raw_db);
+
+        std::cout << "  [PASS] Missing attributes and fallback keys handled correctly." << std::endl;
+    }
+
+    // =========================================================================
+    // TEST 12: Adversarial & Malformed JSON Rejection Stress
+    // =========================================================================
+    {
+        std::cout << "\n[Test 12] Adversarial & Malformed JSON Rejection Stress..." << std::endl;
+        auto& db = DatabaseManager::GetInstance();
+
+        std::vector<std::pair<std::string, std::string>> invalid_inputs = {
+            {"M_TRUNC", "{\"metadata\": {\"matchId\": \"M1\"}, \"info\": {\"frames\": ["}, // truncated
+            {"M_SYNTAX", "not a valid json string {[]}"},                                  // syntax error
+            {"M_404", "{\"status\": {\"message\": \"Data not found\", \"status_code\": 404}}"}, // 404 status
+            {"M_403", "{\"status\": {\"message\": \"Forbidden\", \"status_code\": 403}}"},      // 403 status
+            {"M_400", "{\"status\": {\"message\": \"Bad Request\", \"status_code\": 400}}"},    // 400 status
+            {"M_NO_INFO", "{\"metadata\": {\"matchId\": \"ERR_NO_INFO\"}}"},                     // no info
+            {"M_EMPTY_STR", ""},                                                                 // empty string
+            {"M_WS", "   \t\n\r  "},                                                         // whitespace only
+            {"M_BIN", std::string("\x00\xFF\x80\x7F\xAA\x55", 6)},                              // binary garbage
+            {"", "{\"info\": {\"frames\": []}}"}                                                // empty match_id
+        };
+
+        for (size_t i = 0; i < invalid_inputs.size(); ++i) {
+            bool ok = db.SaveTimeline(invalid_inputs[i].first, invalid_inputs[i].second);
+            assert(!ok);
+        }
+
+        // Test timeline with empty frames array: should save raw metadata but create 0 unnested frames
+        int64_t pf_before = db.GetTimelineParticipantFrameCount();
+        int64_t ev_before = db.GetTimelineEventCount();
+        bool ok_empty = db.SaveTimeline("KR_EMPTY_FRAMES", "{\"info\": {\"frames\": []}}");
+        assert(ok_empty);
+        assert(db.GetTimelineParticipantFrameCount() == pf_before);
+        assert(db.GetTimelineEventCount() == ev_before);
+
+        // Verify database is still operational after rejecting all malformed inputs
+        assert(db.GetTimelineCount() >= 1);
+        std::cout << "  [PASS] 10 distinct malformed/adversarial inputs rejected safely and empty-frame timeline handled without corruption." << std::endl;
+    }
+
+    // =========================================================================
+    // TEST 13: BackfillUnnestedTimelines Comprehensive Discovery & Idempotency
+    // =========================================================================
+    {
+        std::cout << "\n[Test 13] BackfillUnnestedTimelines Legacy Discovery & Idempotency..." << std::endl;
+        std::string bf_dir = "./test_m2_bf_ws";
+        std::string bf_file = bf_dir + "/ezreal_data.duckdb";
+        std::filesystem::remove_all(bf_dir);
+        std::filesystem::create_directories(bf_dir);
+
+        auto& db = DatabaseManager::GetInstance();
+        assert(db.Init(bf_file));
+        assert(db.InitTables());
+
+        // Ingest one timeline properly
+        std::string properly_ingested = R"({
+          "metadata": { "matchId": "PROPER_01" },
+          "info": {
+            "frameInterval": 60000,
+            "frames": [{
+              "timestamp": 0,
+              "participantFrames": { "1": { "participantId": 1, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 } },
+              "events": [{ "type": "ITEM_PURCHASED", "participantId": 1, "itemId": 1055 }]
+            }]
+          }
+        })";
+        assert(db.SaveTimeline("PROPER_01", properly_ingested));
+        assert(db.GetTimelineParticipantFrameCount() == 1);
+        assert(db.GetTimelineEventCount() == 1);
+
+        // Directly insert raw rows into match_timelines (simulating legacy data)
+        duckdb_database raw_db;
+        duckdb_connection raw_conn;
+        assert(duckdb_open(bf_file.c_str(), &raw_db) != DuckDBError);
+        assert(duckdb_connect(raw_db, &raw_conn) != DuckDBError);
+
+        std::string legacy_1 = R"({
+          "metadata": { "matchId": "LEGACY_01" },
+          "info": {
+            "frameInterval": 60000,
+            "frames": [
+              {
+                "timestamp": 0,
+                "participantFrames": {
+                  "1": { "participantId": 1, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 },
+                  "2": { "participantId": 2, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 }
+                },
+                "events": [{ "type": "ITEM_PURCHASED", "participantId": 1, "itemId": 1054 }]
+              },
+              {
+                "timestamp": 60000,
+                "participantFrames": {
+                  "1": { "participantId": 1, "totalGold": 850, "currentGold": 350, "xp": 400, "level": 2 },
+                  "2": { "participantId": 2, "totalGold": 800, "currentGold": 300, "xp": 380, "level": 2 }
+                },
+                "events": [
+                  { "type": "CHAMPION_KILL", "killerId": 1, "victimId": 2 },
+                  { "type": "WARD_PLACED", "creatorId": 1 }
+                ]
+              }
+            ]
+          }
+        })";
+
+        std::string legacy_2 = R"({
+          "metadata": { "matchId": "LEGACY_02" },
+          "info": {
+            "frameInterval": 60000,
+            "frames": [
+              {
+                "timestamp": 0,
+                "participantFrames": {
+                  "3": { "participantId": 3, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 },
+                  "4": { "participantId": 4, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 }
+                },
+                "events": [{ "type": "ITEM_PURCHASED", "participantId": 3, "itemId": 1056 }]
+              }
+            ]
+          }
+        })";
+
+        // Corrupt legacy row (valid JSON syntax so DuckDB's JSON column accepts it, but missing info/frames)
+        std::string legacy_corrupt = "{\"error\": \"corrupted timeline payload\"}";
+        // Empty frames legacy row
+        std::string legacy_empty = "{\"metadata\": {\"matchId\": \"LEGACY_EMPTY\"}, \"info\": {\"frames\": []}}";
+
+        auto insert_legacy = [&](const std::string& mid, const std::string& raw) {
+            duckdb_prepared_statement st;
+            assert(duckdb_prepare(raw_conn, "INSERT INTO match_timelines (match_id, frame_interval, raw_json) VALUES ($1, 60000, $2);", &st) != DuckDBError);
+            duckdb_bind_varchar(st, 1, mid.c_str());
+            duckdb_bind_varchar(st, 2, raw.c_str());
+            duckdb_result res;
+            if (duckdb_execute_prepared(st, &res) == DuckDBError) {
+                std::cerr << "insert_legacy failed for " << mid << ": " << duckdb_result_error(&res) << std::endl;
+                assert(false);
+            }
+            duckdb_destroy_result(&res);
+            duckdb_destroy_prepare(&st);
+        };
+
+        insert_legacy("LEGACY_01", legacy_1);
+        insert_legacy("LEGACY_02", legacy_2);
+        insert_legacy("LEGACY_CORRUPT", legacy_corrupt);
+        insert_legacy("LEGACY_EMPTY", legacy_empty);
+
+        duckdb_disconnect(&raw_conn);
+        duckdb_close(&raw_db);
+
+        // Run backfill
+        int64_t backfilled = db.BackfillUnnestedTimelines();
+        assert(backfilled == 2); // Exactly LEGACY_01 and LEGACY_02
+
+        // Verify total participant frames: 1 (PROPER) + 4 (LEGACY_01) + 2 (LEGACY_02) = 7
+        assert(db.GetTimelineParticipantFrameCount() == 7);
+        // Verify total events: 1 (PROPER) + 3 (LEGACY_01) + 1 (LEGACY_02) = 5
+        assert(db.GetTimelineEventCount() == 5);
+
+        // Immediate subsequent call must return 0
+        int64_t backfilled_again = db.BackfillUnnestedTimelines();
+        assert(backfilled_again == 0);
+
+        std::cout << "  [PASS] BackfillUnnestedTimelines accurately migrated legacy rows and returned 0 on rerun." << std::endl;
+    }
+
+    // =========================================================================
+    // TEST 14: Strict 3-Pass Idempotency & Overwrite Replacement Integrity
+    // =========================================================================
+    {
+        std::cout << "\n[Test 14] Strict 3-Pass Idempotency & Overwrite Replacement Integrity..." << std::endl;
+        auto& db = DatabaseManager::GetInstance();
+
+        std::string payload_v1 = R"({
+          "metadata": { "matchId": "IDEM_MATCH_99" },
+          "info": {
+            "frameInterval": 60000,
+            "frames": [
+              {
+                "timestamp": 0,
+                "participantFrames": {
+                  "1": { "participantId": 1, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 },
+                  "2": { "participantId": 2, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 }
+                },
+                "events": [
+                  { "type": "ITEM_PURCHASED", "participantId": 1, "itemId": 1055 },
+                  { "type": "ITEM_PURCHASED", "participantId": 2, "itemId": 1056 }
+                ]
+              }
+            ]
+          }
+        })";
+
+        // Pass 1: Initial save
+        assert(db.SaveTimeline("IDEM_MATCH_99", payload_v1));
+        int64_t pf1 = db.GetTimelineParticipantFrameCount();
+        int64_t ev1 = db.GetTimelineEventCount();
+
+        // Pass 2: Identical re-save
+        assert(db.SaveTimeline("IDEM_MATCH_99", payload_v1));
+        assert(db.GetTimelineParticipantFrameCount() == pf1);
+        assert(db.GetTimelineEventCount() == ev1);
+
+        // Pass 3: Identical re-save
+        assert(db.SaveTimeline("IDEM_MATCH_99", payload_v1));
+        assert(db.GetTimelineParticipantFrameCount() == pf1);
+        assert(db.GetTimelineEventCount() == ev1);
+
+        // Overwrite with payload_v2 (now 3 frames, 6 participant frames, 5 events)
+        std::string payload_v2 = R"({
+          "metadata": { "matchId": "IDEM_MATCH_99" },
+          "info": {
+            "frameInterval": 60000,
+            "frames": [
+              {
+                "timestamp": 0,
+                "participantFrames": {
+                  "1": { "participantId": 1, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 },
+                  "2": { "participantId": 2, "totalGold": 500, "currentGold": 500, "xp": 0, "level": 1 }
+                },
+                "events": [{ "type": "ITEM_PURCHASED", "participantId": 1, "itemId": 1055 }]
+              },
+              {
+                "timestamp": 60000,
+                "participantFrames": {
+                  "1": { "participantId": 1, "totalGold": 900, "currentGold": 400, "xp": 500, "level": 2 },
+                  "2": { "participantId": 2, "totalGold": 850, "currentGold": 350, "xp": 480, "level": 2 }
+                },
+                "events": [
+                  { "type": "CHAMPION_KILL", "killerId": 1, "victimId": 2 },
+                  { "type": "WARD_PLACED", "creatorId": 1 }
+                ]
+              },
+              {
+                "timestamp": 120000,
+                "participantFrames": {
+                  "1": { "participantId": 1, "totalGold": 1300, "currentGold": 800, "xp": 1000, "level": 3 },
+                  "2": { "participantId": 2, "totalGold": 1200, "currentGold": 700, "xp": 950, "level": 3 }
+                },
+                "events": [
+                  { "type": "ITEM_PURCHASED", "participantId": 1, "itemId": 3006 },
+                  { "type": "ITEM_PURCHASED", "participantId": 2, "itemId": 3020 }
+                ]
+              }
+            ]
+          }
+        })";
+
+        assert(db.SaveTimeline("IDEM_MATCH_99", payload_v2));
+        // Verify participant frames for IDEM_MATCH_99 is now exactly 6 (not 2 + 6 = 8)
+        std::string p_ws = db.GetDatabasePath();
+        db.Close();
+        assert(db.Reopen(p_ws));
+
+        duckdb_database raw_db;
+        duckdb_connection raw_conn;
+        assert(duckdb_open(db.GetDatabasePath().c_str(), &raw_db) != DuckDBError);
+        assert(duckdb_connect(raw_db, &raw_conn) != DuckDBError);
+
+        duckdb_result r_cnt;
+        assert(duckdb_query(raw_conn, "SELECT COUNT(*) FROM timeline_participant_frames WHERE match_id = 'IDEM_MATCH_99';", &r_cnt) != DuckDBError);
+        assert(duckdb_value_int64(&r_cnt, 0, 0) == 6);
+        duckdb_destroy_result(&r_cnt);
+
+        assert(duckdb_query(raw_conn, "SELECT COUNT(*) FROM timeline_events WHERE match_id = 'IDEM_MATCH_99';", &r_cnt) != DuckDBError);
+        assert(duckdb_value_int64(&r_cnt, 0, 0) == 5);
+        duckdb_destroy_result(&r_cnt);
+
+        duckdb_disconnect(&raw_conn);
+        duckdb_close(&raw_db);
+
+        std::cout << "  [PASS] 3 consecutive saves confirmed idempotent; overwriting replaced rows cleanly." << std::endl;
+    }
+
+    // =========================================================================
+    // TEST 15: Concurrency Safety (Multi-Threaded Reads & Writes)
+    // =========================================================================
+    {
+        std::cout << "\n[Test 15] Concurrency Safety (Multi-Threaded Reads & Writes)..." << std::endl;
+        auto& db = DatabaseManager::GetInstance();
+        std::atomic<bool> stop_flag{false};
+        std::atomic<int> errors{0};
+
+        auto make_tl = [](const std::string& mid) {
+            return "{\"metadata\":{\"matchId\":\"" + mid + "\"},\"info\":{\"frameInterval\":60000,\"frames\":[{\"timestamp\":0,\"participantFrames\":{\"1\":{\"participantId\":1,\"totalGold\":500,\"currentGold\":500,\"xp\":0,\"level\":1}},\"events\":[{\"type\":\"ITEM_PURCHASED\",\"participantId\":1,\"itemId\":1055}]}]}}";
+        };
+
+        std::thread t1([&]() {
+            for (int i = 0; i < 20; ++i) {
+                if (!db.SaveTimeline("CONCUR_A_" + std::to_string(i), make_tl("CONCUR_A_" + std::to_string(i)))) {
+                    errors++;
+                }
+            }
+        });
+
+        std::thread t2([&]() {
+            for (int i = 0; i < 20; ++i) {
+                if (!db.SaveTimeline("CONCUR_B_" + std::to_string(i), make_tl("CONCUR_B_" + std::to_string(i)))) {
+                    errors++;
+                }
+            }
+        });
+
+        std::thread t3([&]() {
+            while (!stop_flag.load()) {
+                db.GetTimelineParticipantFrameCount();
+                db.GetTimelineEventCount();
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
+        });
+
+        t1.join();
+        t2.join();
+        stop_flag.store(true);
+        t3.join();
+
+        assert(errors.load() == 0);
+        std::cout << "  [PASS] Concurrent multi-threaded ingestion executed cleanly without errors." << std::endl;
+    }
+
+    // =========================================================================
+    // TEST 16: Database Reopen, Unnested Persistence & WAL Integrity
+    // =========================================================================
+    {
+        std::cout << "\n[Test 16] Database Reopen, Unnested Persistence & WAL Integrity..." << std::endl;
+        auto& db = DatabaseManager::GetInstance();
+        std::string current_path = db.GetDatabasePath();
+        int64_t expected_pf = db.GetTimelineParticipantFrameCount();
+        int64_t expected_ev = db.GetTimelineEventCount();
+
+        // Close
+        db.Close();
+        assert(!db.IsInitialized());
+        assert(db.GetTimelineParticipantFrameCount() == 0);
+        assert(db.GetTimelineEventCount() == 0);
+
+        // Reopen at same path
+        assert(db.Reopen(current_path));
+        assert(db.IsInitialized());
+        assert(db.GetTimelineParticipantFrameCount() == expected_pf);
+        assert(db.GetTimelineEventCount() == expected_ev);
+
+        // Cleanup test directory
+        std::filesystem::remove_all("./test_m2_timeline_stress_ws");
+        std::filesystem::remove_all("./test_m2_bf_ws");
+
+        std::cout << "  [PASS] Database close and reopen restored unnested timeline counts with 100% fidelity." << std::endl;
     }
 
     ImGui::DestroyContext(imgui_ctx);

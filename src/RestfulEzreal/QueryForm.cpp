@@ -74,6 +74,217 @@ namespace restfulEz {
         this->_endpoint_method_ind = endpoint_method_ind;
     };
 
+    static std::string trim_str(const std::string& s) {
+        std::size_t start = 0;
+        std::size_t end = s.size();
+        while (start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\r' || s[start] == '\n')) ++start;
+        while (end > start && (s[end - 1] == ' ' || s[end - 1] == '\t' || s[end - 1] == '\r' || s[end - 1] == '\n')) --end;
+        return s.substr(start, end - start);
+    }
+
+    static std::string to_upper_ascii(std::string s) {
+        for (char& c : s) {
+            if (c >= 'a' && c <= 'z') c = static_cast<char>(c - ('a' - 'A'));
+        }
+        return s;
+    }
+
+    int BaseForm::expected_routing_indicator() const noexcept {
+        if (this->_game_name == "Riot" || this->_game_ind == 0) {
+            return REGIONAL_INDICATOR;
+        }
+        if (this->_game_name == "Legends of Runeterra") {
+            return REGIONAL_INDICATOR;
+        }
+        if (this->_game_name == "Valorant") {
+            return VAL_PLATFORM_INDICATOR;
+        }
+        if (this->_game_name == "League of Legends" || this->_game_ind == 1) {
+            if (this->_endpoint == "Match" || this->_endpoint_ind == 6) {
+                return REGIONAL_INDICATOR;
+            }
+            return PLATFORM_INDICATOR;
+        }
+        if (this->_game_name == "Teamfight Tactics" || this->_game_ind == 2) {
+            if (this->_endpoint == "Match" || this->_endpoint_ind == 1) {
+                return REGIONAL_INDICATOR;
+            }
+            return PLATFORM_INDICATOR;
+        }
+        return PLATFORM_INDICATOR;
+    }
+
+    const std::vector<const char*>& BaseForm::valid_routing_options() const noexcept {
+        static const std::vector<const char*> regional_opts = {
+            "AMERICAS", "ASIA", "EUROPE", "SEA"
+        };
+        static const std::vector<const char*> platform_opts = {
+            "OC1", "KR", "NA1", "EUW1", "EUN1", "JP1", "BR1", "LA1",
+            "LA2", "TR1", "RU", "SG2", "PH2", "TH2", "TW2", "VN2"
+        };
+        static const std::vector<const char*> val_opts = {
+            "AP", "BR", "EU", "KR", "LATAM", "NA", "ESPORTS"
+        };
+        int ind = this->expected_routing_indicator();
+        if (ind == REGIONAL_INDICATOR) return regional_opts;
+        if (ind == VAL_PLATFORM_INDICATOR) return val_opts;
+        return platform_opts;
+    }
+
+    const char* BaseForm::routing_type_label() const noexcept {
+        int ind = this->expected_routing_indicator();
+        if (ind == REGIONAL_INDICATOR) {
+            return "Region (AMERICAS, ASIA, EUROPE, SEA)";
+        }
+        if (ind == VAL_PLATFORM_INDICATOR) {
+            return "Valorant Shard (AP, BR, EU, KR, LATAM, NA, ESPORTS)";
+        }
+        return "Platform Shard (OC1, KR, NA1, EUW1, ...)";
+    }
+
+    bool BaseForm::validate_routing_input(const std::string& raw_val, std::string* err_msg, std::string* suggested_fix) const {
+        if (err_msg) err_msg->clear();
+        if (suggested_fix) suggested_fix->clear();
+
+        int expected_ind = this->expected_routing_indicator();
+        std::vector<std::string> tokens;
+        std::stringstream ss(raw_val);
+        std::string item;
+        while (std::getline(ss, item, ',')) {
+            std::string trimmed = trim_str(item);
+            if (!trimmed.empty()) {
+                tokens.push_back(trimmed);
+            }
+        }
+        if (tokens.empty()) {
+            return false;
+        }
+
+        for (const auto& tok : tokens) {
+            try {
+                riotcpp::args::str_to_routing_for_indicator(tok, expected_ind);
+            } catch (const std::invalid_argument& ex) {
+                if (err_msg) {
+                    *err_msg = ex.what();
+                }
+                if (suggested_fix) {
+                    if (expected_ind == REGIONAL_INDICATOR) {
+                        auto pf = riotcpp::args::str_to_platform(tok);
+                        if (pf.has_value()) {
+                            *suggested_fix = riotcpp::args::regional_to_str(riotcpp::args::platform_to_regional(pf.value()));
+                        }
+                    } else if (expected_ind == PLATFORM_INDICATOR) {
+                        auto reg = riotcpp::args::str_to_regional(tok);
+                        if (reg.has_value()) {
+                            switch (reg.value()) {
+                                case riotcpp::args::regional::SEA: *suggested_fix = "OC1"; break;
+                                case riotcpp::args::regional::ASIA: *suggested_fix = "KR"; break;
+                                case riotcpp::args::regional::AMERICAS: *suggested_fix = "NA1"; break;
+                                case riotcpp::args::regional::EUROPE: *suggested_fix = "EUW1"; break;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool BaseForm::validate_param_input(std::size_t ind, const std::string& raw_val, std::string* err_msg, std::string* suggested_fix) const {
+        if (err_msg) err_msg->clear();
+        if (suggested_fix) suggested_fix->clear();
+        if (ind == 0) {
+            return this->validate_routing_input(raw_val, err_msg, suggested_fix);
+        }
+        if (raw_val.empty()) {
+            return false;
+        }
+        if (ind < this->_param_names.size() && (this->_game_name == "League of Legends" || this->_game_ind == 1) &&
+            (this->_endpoint == "League" || this->_endpoint_ind == 3)) {
+            std::string pname(this->_param_names[ind].name);
+            std::stringstream ss(raw_val);
+            std::string item;
+            while (std::getline(ss, item, ',')) {
+                std::string tok = trim_str(item);
+                if (tok.empty()) continue;
+                if (pname == "Queue") {
+                    if (!riotcpp::args::valid_queue(tok)) {
+                        if (err_msg) {
+                            *err_msg = "Invalid Queue '" + tok + "' (expected RANKED_SOLO_5x5, RANKED_FLEX_SR, or RANKED_FLEX_TT)";
+                        }
+                        if (suggested_fix) {
+                            *suggested_fix = "RANKED_SOLO_5x5";
+                        }
+                        return false;
+                    }
+                } else if (pname == "Tier") {
+                    std::string up = to_upper_ascii(tok);
+                    bool exp_tier = (this->_endpoint_method == "Experimental" || this->_endpoint_method_ind == 6) &&
+                                    (up == "CHALLENGER" || up == "GRANDMASTER" || up == "MASTER");
+                    if (!riotcpp::args::valid_tier(tok) && !exp_tier) {
+                        if (err_msg) {
+                            *err_msg = "Invalid Tier '" + tok + "' (expected IRON, BRONZE, SILVER, GOLD, PLATINUM, EMERALD, or DIAMOND)";
+                        }
+                        return false;
+                    }
+                } else if (pname == "Division") {
+                    if (!riotcpp::args::valid_division(tok)) {
+                        if (err_msg) {
+                            *err_msg = "Invalid Division '" + tok + "' (expected I, II, III, or IV)";
+                        }
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    std::string BaseForm::sanitize_routing_input(const std::string& raw_val) const {
+        if (raw_val.find(',') == std::string::npos) {
+            return to_upper_ascii(trim_str(raw_val));
+        }
+        std::stringstream ss(raw_val);
+        std::string item;
+        std::string out;
+        while (std::getline(ss, item, ',')) {
+            std::string tok = to_upper_ascii(trim_str(item));
+            if (!tok.empty()) {
+                if (!out.empty()) out += ", ";
+                out += tok;
+            }
+        }
+        return out;
+    }
+
+    std::string BaseForm::sanitize_param_input(std::size_t ind, const std::string& raw_val) const {
+        if (ind == 0) {
+            return this->sanitize_routing_input(raw_val);
+        }
+        if (ind < this->_param_names.size()) {
+            std::string pname(this->_param_names[ind].name);
+            if (pname == "Queue") {
+                std::stringstream ss(raw_val);
+                std::string item;
+                std::string out;
+                while (std::getline(ss, item, ',')) {
+                    std::string trimmed = trim_str(item);
+                    if (trimmed.empty()) continue;
+                    auto q = riotcpp::args::str_to_queue(trimmed);
+                    std::string tok = q.has_value() ? riotcpp::args::queue_to_str(q.value()) : to_upper_ascii(trimmed);
+                    if (!out.empty()) out += ", ";
+                    out += tok;
+                }
+                return out.empty() ? trim_str(raw_val) : out;
+            }
+            if (pname == "Tier" || pname == "Division") {
+                return this->sanitize_routing_input(raw_val);
+            }
+        }
+        return raw_val;
+    }
+
     void QUERY_FORM::render_title() {
         ImGui::Text((this->_game_name + " | " + this->_endpoint + " | " + this->_endpoint_method).data());
     }
@@ -100,11 +311,11 @@ namespace restfulEz {
 
         if (!this->form_execute) {
             if (ImGui::Button("Send")) {
-                bool empty = false;
+                bool all_valid = true;
                 for (int i = 0; i < this->_n_params; i++) {
-                    empty |= strlen(this->_params_in_form[i].param) == 0;
+                    all_valid &= this->validate_param_input(static_cast<std::size_t>(i), this->_params_in_form[i].param);
                 }
-                if (!empty) {
+                if (all_valid) {
                     this->submit_request();
                 }
             }
@@ -115,6 +326,38 @@ namespace restfulEz {
 
     void QUERY_FORM::render_singular_field(const int i, bool already_sent) {
         ImGui::InputText(this->_param_names[i], this->_params_in_form[i], 256, already_sent ? ImGuiInputTextFlags_None : this->_type_ordering[i]);
+        if (!already_sent) {
+            if (i == 0) {
+                ImGui::TextColored(ImVec4(0.60f, 0.60f, 0.65f, 1.0f), "Expected: %s", this->routing_type_label());
+                ImGui::SameLine();
+                std::string pick_btn = "Pick Routing##QF" + this->_ID;
+                std::string pick_pop = "QFRoutingPickerPopup" + this->_ID;
+                if (ImGui::SmallButton(pick_btn.c_str())) {
+                    ImGui::OpenPopup(pick_pop.c_str());
+                }
+                if (ImGui::BeginPopup(pick_pop.c_str())) {
+                    for (const char* opt : this->valid_routing_options()) {
+                        if (ImGui::Selectable(opt)) {
+                            this->_params_in_form[0] = opt;
+                        }
+                    }
+                    ImGui::EndPopup();
+                }
+            }
+            if (strlen(this->_params_in_form[i].param) > 0) {
+                std::string err_msg;
+                std::string suggested_fix;
+                if (!this->validate_param_input(static_cast<std::size_t>(i), this->_params_in_form[i].param, &err_msg, &suggested_fix)) {
+                    ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "%s", err_msg.c_str());
+                    if (!suggested_fix.empty()) {
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton(("Use " + suggested_fix + "##QFFix" + std::to_string(i)).c_str())) {
+                            this->_params_in_form[i] = suggested_fix.c_str();
+                        }
+                    }
+                }
+            }
+        }
     }
 
     void QUERY_FORM::render_required(bool already_sent) {
@@ -225,6 +468,8 @@ namespace restfulEz {
     request QUERY_FORM::construct_request() {
         request new_task; new_task._game = this->_game_ind; new_task._endpoint = this->_endpoint_ind; new_task._endpoint_method = this->_endpoint_method_ind;
         for (int i = 0; i < this->_n_params; i++) { // add inputs into the request structure
+            std::string sanitized = this->sanitize_param_input(static_cast<std::size_t>(i), this->_params_in_form[i].param);
+            this->_params_in_form[i] = sanitized.c_str();
             new_task.params.push_back(this->_params_in_form[i]);
         }
         if (this->_accepts_optional) { // add optional inputs into the request structure
@@ -286,11 +531,40 @@ namespace restfulEz {
                 );
                 this->show_quick_fill = true;
             }
+            auto sync_quick_fill_from_root = [this]() -> bool {
+                for (const auto& f : this->forms) {
+                    if (f && !f->check_dependent()) {
+                        if (f->get_param_count() >= 1) {
+                            std::string r = f->get_param_value(0);
+                            if (!r.empty()) {
+                                strncpy(this->quick_fill_routing, r.c_str(), sizeof(this->quick_fill_routing) - 1);
+                                this->quick_fill_routing[sizeof(this->quick_fill_routing) - 1] = '\0';
+                            }
+                        }
+                        if (f->get_param_count() >= 3) {
+                            std::string gn = f->get_param_value(1);
+                            std::string tl = f->get_param_value(2);
+                            if (!gn.empty()) {
+                                strncpy(this->quick_fill_game_name, gn.c_str(), sizeof(this->quick_fill_game_name) - 1);
+                                this->quick_fill_game_name[sizeof(this->quick_fill_game_name) - 1] = '\0';
+                            }
+                            if (!tl.empty()) {
+                                strncpy(this->quick_fill_tagline, tl.c_str(), sizeof(this->quick_fill_tagline) - 1);
+                                this->quick_fill_tagline[sizeof(this->quick_fill_tagline) - 1] = '\0';
+                            }
+                            return true;
+                        }
+                        return false;
+                    }
+                }
+                return false;
+            };
             if (ImGui::Selectable("Starter: Challenger Database Builder")) {
                 TemplateManager::GetInstance().LoadTemplateFromString(
                     TemplateManager::GetInstance().GetStarterChallengerDatabaseJson(),
                     *this
                 );
+                sync_quick_fill_from_root();
             }
             ImGui::Separator();
             auto tdir = FileManager::GetInstance().GetWorkspacePaths().templates_dir;
@@ -298,7 +572,7 @@ namespace restfulEz {
             for (const auto& tmpl_pair : available) {
                 if (ImGui::Selectable(tmpl_pair.first.c_str())) {
                     TemplateManager::GetInstance().LoadTemplate(tmpl_pair.second.string(), *this);
-                    this->show_quick_fill = true;
+                    this->show_quick_fill = sync_quick_fill_from_root();
                 }
             }
             if (!available.empty()) {
@@ -308,7 +582,7 @@ namespace restfulEz {
                 std::string file_path = FileManager::OpenFileDialog("Template JSON (*.json)", "json");
                 if (!file_path.empty()) {
                     TemplateManager::GetInstance().LoadTemplate(file_path, *this);
-                    this->show_quick_fill = true;
+                    this->show_quick_fill = sync_quick_fill_from_root();
                 }
             }
             if (ImGui::Selectable("Save Current Template...")) {
@@ -324,6 +598,16 @@ namespace restfulEz {
         ImGui::SameLine();
 
         if (ImGui::Button("Quick Fill")) {
+            for (const auto& f : this->forms) {
+                if (f && !f->check_dependent() && f->get_param_count() >= 1) {
+                    std::string r = f->get_param_value(0);
+                    if (!r.empty()) {
+                        strncpy(this->quick_fill_routing, r.c_str(), sizeof(this->quick_fill_routing) - 1);
+                        this->quick_fill_routing[sizeof(this->quick_fill_routing) - 1] = '\0';
+                    }
+                    break;
+                }
+            }
             this->show_quick_fill = true;
         }
         ImGui::SameLine();

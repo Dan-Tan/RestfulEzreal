@@ -1,8 +1,10 @@
 #include "BatchRequests.h"
+#include "db/DatabaseManager.h"
 #include <iostream>
 #include <cassert>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 using namespace restfulEz;
 
@@ -777,6 +779,73 @@ int main() {
 
         assert(batch.select_next_ready(wait_fn).same_endpoint(BatchRequest::FINISHED));
         std::cout << "  [PASS] Rate-limit-aware node interleaving & opportunistic child streaming" << std::endl;
+    }
+
+    // 25. Test ValuePool::SkipPlayersWithMatchesInDB pre-filtering
+    {
+        std::string batch_db_path = "./test_output_batch/test_batch.duckdb";
+        if (std::filesystem::exists("./test_output_batch")) {
+            std::filesystem::remove_all("./test_output_batch");
+        }
+        std::filesystem::create_directories("./test_output_batch");
+
+        restfulEz::DatabaseManager& db = restfulEz::DatabaseManager::GetInstance();
+        db.Init(batch_db_path);
+
+        // Populate a match with participant PUUID_A_FAKER
+        db.ResolveOrCreatePlayer("DEV_A", "PUUID_A_FAKER", "Faker", "KR1");
+        std::string sample_match = R"({
+            "metadata": { "matchId": "KR_BATCH_001" },
+            "info": {
+                "gameCreation": 1650000000000,
+                "gameDuration": 1800,
+                "gameVersion": "14.10.1",
+                "queueId": 420,
+                "participants": [
+                    { "participantId": 1, "puuid": "PUUID_A_FAKER", "riotIdGameName": "Faker", "riotIdTagline": "KR1", "championName": "Ahri", "championId": 103, "teamId": 100, "kills": 5, "deaths": 0, "assists": 10, "win": true }
+                ]
+            }
+        })";
+        db.SaveMatch("KR_BATCH_001", sample_match);
+
+        // Also save player without matches
+        db.ResolveOrCreatePlayer("DEV_A", "PUUID_A_EZREAL", "Ezreal", "NA1");
+
+        // Create pool with SkipPlayersWithMatchesInDB
+        ValuePool pool(true);
+        pool.set_filter(ValuePool::SkipPlayersWithMatchesInDB(1));
+        assert(pool.has_filter());
+
+        // Pushing PUUID_A_FAKER should be filtered out because player already has 1 match in DB
+        bool pushed_faker = pool.push("PUUID_A_FAKER");
+        assert(!pushed_faker);
+        assert(pool.filtered_out_count() == 1);
+        assert(pool.size() == 0);
+
+        // Pushing PUUID_A_EZREAL should succeed because player has 0 matches
+        bool pushed_ezreal = pool.push("PUUID_A_EZREAL");
+        assert(pushed_ezreal);
+        assert(pool.filtered_out_count() == 1);
+        assert(pool.size() == 1);
+
+        // Pushing brand new PUUID should succeed
+        bool pushed_new = pool.push("PUUID_BRAND_NEW");
+        assert(pushed_new);
+        assert(pool.filtered_out_count() == 1);
+        assert(pool.size() == 2);
+
+        // Test with higher min_matches threshold (e.g. min_matches = 2)
+        ValuePool pool2(true);
+        pool2.set_filter(ValuePool::SkipPlayersWithMatchesInDB(2));
+        // PUUID_A_FAKER has only 1 match (< 2), so it should NOT be skipped!
+        bool pushed_faker2 = pool2.push("PUUID_A_FAKER");
+        assert(pushed_faker2);
+        assert(pool2.filtered_out_count() == 0);
+        assert(pool2.size() == 1);
+
+        db.Close();
+        std::filesystem::remove_all("./test_output_batch");
+        std::cout << "  [PASS] ValuePool::SkipPlayersWithMatchesInDB filter & threshold behavior" << std::endl;
     }
 
     std::cout << "[Test] All BatchRequests & ValuePool Pipeline tests passed successfully!" << std::endl;

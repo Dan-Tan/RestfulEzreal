@@ -147,6 +147,28 @@ add_executable(test_m2_adversarial tests/test_m2_adversarial.cpp)
 target_include_directories(test_m2_adversarial PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
 target_link_libraries(test_m2_adversarial PRIVATE RestfulEzreal)
 
+add_executable(test_m1_adversarial tests/test_m1_adversarial.cpp)
+target_include_directories(test_m1_adversarial PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_m1_adversarial PRIVATE RestfulEzreal)
+
+add_executable(test_e2e_features tests/test_e2e_features.cpp)
+target_include_directories(test_e2e_features PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_e2e_features PRIVATE RestfulEzreal)
+
+add_executable(test_m1_challenger1 tests/test_m1_challenger1.cpp)
+target_include_directories(test_m1_challenger1 PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_m1_challenger1 PRIVATE RestfulEzreal)
+
+add_executable(test_m2_challenger2 tests/test_m2_challenger2.cpp)
+target_include_directories(test_m2_challenger2 PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_m2_challenger2 PRIVATE RestfulEzreal)
+
+add_executable(test_m3_adversarial tests/test_m3_adversarial.cpp)
+target_include_directories(test_m3_adversarial PRIVATE ./third_party/riot-cpp/src/riot-cpp ./third_party/imgui ./third_party/glfw ./third_party/simdjson ./third_party/duckdb/include ./src/RestfulEzreal/db ./src/RestfulEzreal ./third_party/nativefiledialog-extended/src/include)
+target_link_libraries(test_m3_adversarial PRIVATE RestfulEzreal)
+
+
+
 
 
 

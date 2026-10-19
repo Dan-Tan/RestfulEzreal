@@ -39,9 +39,9 @@ Graphs can be saved and loaded as JSON templates. Three starter templates are in
 
 ## Database & Analysis
 
-All responses are saved as raw JSON files in `./output/raw/` (inspectable with formatting and line numbers in the Request History tab) and automatically ingested into an embedded DuckDB database at `./output/db/ezreal_data.duckdb`. The database schema normalizes players, multi-developer PUUID mappings, Riot ID aliases, matches, match participants, and timelines.
+All responses are saved as raw JSON files in `./output/raw/` (inspectable with formatting and line numbers in the Request History tab) and automatically ingested into an embedded DuckDB database at `./output/db/ezreal_data.duckdb`. The database schema normalizes players, multi-developer PUUID mappings, Riot ID aliases, matches, match participants, timelines, and unnested timeline tables (`timeline_participant_frames` and `timeline_events`).
 
-An example Python analysis script is provided in `scripts/analyze_challenger_db.py` to query the DuckDB database and export summary tables, `@10m`/`@15m` lane differentials, objective win conversions, and champion/player statistics to an Excel workbook (`./output/challenger_analysis.xlsx`) and CSV files:
+The Request History view includes built-in DuckDB analytics dashboards, timeline unnesting backfill, an interactive read-only SQL query runner with preset analytical queries, and CSV export to `./output/exports/`. An example Python analysis script is also provided in `scripts/analyze_challenger_db.py` to query the DuckDB database and export summary tables, `@10m`/`@15m` lane differentials, objective win conversions, and champion/player statistics to an Excel workbook (`./output/challenger_analysis.xlsx`) and CSV files:
 
 ```bash
 python3 scripts/analyze_challenger_db.py --db ./output/db/ezreal_data.duckdb --out ./output/challenger_analysis.xlsx --csv-dir ./output/exports
@@ -55,6 +55,8 @@ python3 scripts/analyze_challenger_db.py --db ./output/db/ezreal_data.duckdb --o
 ![Iterative Request](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/LinkedIterativeRequests.png?raw=true "Iterative Linked Requests")
 ![Config Page](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/ConfigPage.png?raw=true "Configuration Page")
 ![Request History](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/RequestHistoryPage.png?raw=true "Request History & JSON Inspector")
+![DuckDB Analytics](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/DuckDBAnalyticsPage.png?raw=true "DuckDB Analytics & Explorer")
+![SQL Query & Export](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/SQLQueryPage.png?raw=true "SQL Query & CSV Export")
 ![Request Status](https://github.com/Dan-Tan/RestfulEzreal/blob/assets/RequestStatusPage.png?raw=true "Request Status & Rate Limit Telemetry")
 
 ## Dependencies

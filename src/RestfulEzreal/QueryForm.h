@@ -45,6 +45,14 @@ namespace restfulEz {
             BaseForm(const BaseForm& copy);
             const std::size_t n_params() const {return this->_n_params;}; //lazy
 
+            int expected_routing_indicator() const noexcept;
+            const std::vector<const char*>& valid_routing_options() const noexcept;
+            const char* routing_type_label() const noexcept;
+            bool validate_routing_input(const std::string& raw_val, std::string* err_msg = nullptr, std::string* suggested_fix = nullptr) const;
+            bool validate_param_input(std::size_t ind, const std::string& raw_val, std::string* err_msg = nullptr, std::string* suggested_fix = nullptr) const;
+            std::string sanitize_routing_input(const std::string& raw_val) const;
+            std::string sanitize_param_input(std::size_t ind, const std::string& raw_val) const;
+
         protected:
             int _game_ind;
             int _endpoint_ind;
@@ -196,6 +204,9 @@ namespace restfulEz {
             virtual void set_optional(std::size_t idx, const std::string& val, bool enabled) = 0;
 
             virtual void refresh_display() = 0;
+
+            virtual int get_expected_routing_indicator() const { return 1; }
+            virtual bool validate_routing(std::string* err_msg = nullptr, std::string* suggested_fix = nullptr) const { return true; }
 
             static std::shared_ptr<LinkedInterface> make_linked(const int game, const int endpoint, const int endpoint_method);
 
@@ -433,6 +444,13 @@ namespace restfulEz {
                 this->on_close_popup();
             }
 
+            int get_expected_routing_indicator() const override {
+                return this->expected_routing_indicator();
+            }
+            bool validate_routing(std::string* err_msg = nullptr, std::string* suggested_fix = nullptr) const override {
+                return this->validate_routing_input(this->_params_in_form[0].param, err_msg, suggested_fix);
+            }
+
             bool check_ready() const override {return this->ready;}
             void construct_base() override;
             void link_final_requests() override;
@@ -608,6 +626,34 @@ namespace restfulEz {
         if (hlg) {
             this->active_field = 0;
         }
+        ImGui::SetCursorPosX(avail.x * 0.25);
+        ImGui::TextColored(ImVec4(0.60f, 0.60f, 0.65f, 1.0f), "Expected: %s", this->routing_type_label());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Pick Routing##0")) {
+            ImGui::OpenPopup("RoutingPickerPopup##0");
+        }
+        if (ImGui::BeginPopup("RoutingPickerPopup##0")) {
+            for (const char* opt : this->valid_routing_options()) {
+                if (ImGui::Selectable(opt)) {
+                    this->_params_in_form[0] = opt;
+                }
+            }
+            ImGui::EndPopup();
+        }
+        if (strlen(this->_params_in_form[0].param) > 0) {
+            std::string err_msg;
+            std::string suggested_fix;
+            if (!this->validate_routing_input(this->_params_in_form[0].param, &err_msg, &suggested_fix)) {
+                ImGui::SetCursorPosX(avail.x * 0.25);
+                ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "%s", err_msg.c_str());
+                if (!suggested_fix.empty()) {
+                    ImGui::SetCursorPosX(avail.x * 0.25);
+                    if (ImGui::SmallButton(("Use " + suggested_fix + "##Fix0").c_str())) {
+                        this->_params_in_form[0] = suggested_fix.c_str();
+                    }
+                }
+            }
+        }
         if constexpr (N > 2) {
             ImGui::SetCursorPosX(avail.x * 0.25);
             ImGui::Checkbox("Zip Mode (Pair Multiple Pools 1-to-1)", &this->zip_mode);
@@ -706,6 +752,13 @@ namespace restfulEz {
             if (ImGui::IsItemActive()) {
                 this->active_field = ind;
             }
+            if (strlen(this->_params_in_form[ind].param) > 0) {
+                std::string err_msg;
+                if (!this->validate_param_input(ind, this->_params_in_form[ind].param, &err_msg, nullptr)) {
+                    ImGui::SetCursorPosX(x_align);
+                    ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "%s", err_msg.c_str());
+                }
+            }
         }
         return linking;
     };
@@ -737,9 +790,24 @@ namespace restfulEz {
         int total = this->exec_tracker->total_count.load();
 
         switch (st) {
-            case NodeExecState::IDLE:
-                ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "[ Idle ]");
+            case NodeExecState::IDLE: {
+                std::string err_msg;
+                std::string suggested_fix;
+                if (strlen(this->_params_in_form[0].param) > 0 &&
+                    !this->validate_routing_input(this->_params_in_form[0].param, &err_msg, &suggested_fix)) {
+                    ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "[ Invalid Routing ]");
+                    if (!suggested_fix.empty()) {
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton(("Use " + suggested_fix + "##SumFix").c_str())) {
+                            this->_params_in_form[0] = suggested_fix.c_str();
+                            this->on_close_popup();
+                        }
+                    }
+                } else {
+                    ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "[ Idle ]");
+                }
                 break;
+            }
             case NodeExecState::READY:
                 ImGui::TextColored(ImVec4(0.2f, 0.7f, 1.0f, 1.0f), "[ Ready ]");
                 break;
@@ -766,12 +834,12 @@ namespace restfulEz {
     template<std::size_t N>
     bool LinkedForm<N>::validate_field(const std::size_t ind) const {
         if (ind == 0) {
-            return strlen(this->_params_in_form[0].param) != 0;
+            return this->validate_routing_input(this->_params_in_form[0].param);
         }
         if (this->linked[ind]) {
             return (ind - 1 < this->parents.size() && this->parents[ind-1] != nullptr);
         } else {
-            return strlen(this->_params_in_form[ind].param) != 0;
+            return this->validate_param_input(ind, this->_params_in_form[ind].param);
         }
     }
 
@@ -1211,8 +1279,12 @@ namespace restfulEz {
 
         // Insert parameters into base request and initialize static ValuePools
         for (std::size_t i = 0; i < this->_params_in_form.size(); i++) {
-            req->params.push_back(this->_params_in_form[i]);
             std::string raw_val(this->_params_in_form[i].param);
+            if (i < N && !this->linked[i]) {
+                raw_val = (i == 0) ? this->sanitize_routing_input(raw_val)
+                                   : this->sanitize_param_input(i, raw_val);
+            }
+            req->params.push_back(PARAM_CONT(raw_val.c_str()));
             if ((i < N && !this->linked[i]) && raw_val.find(',') != std::string::npos) {
                 req->set_param_pool(i, ValuePool::FromDelimitedString(raw_val, ',', this->deduplicate_pool[i]));
             }
@@ -1309,6 +1381,9 @@ namespace restfulEz {
                     pool->set_filter(ValuePool::SkipExistingPlayersInDB());
                 } else if (this->_game_ind == 1 && this->_endpoint_ind == 6 && this->_endpoint_method_ind == 1) {
                     pool->set_filter(ValuePool::SkipExistingTimelinesInDB());
+                } else if ((this->_game_ind == 1 && this->_endpoint_ind == 6 && this->_endpoint_method_ind == 2) ||
+                           (this->_game_ind == 2 && this->_endpoint_ind == 1 && this->_endpoint_method_ind == 0)) {
+                    pool->set_filter(ValuePool::SkipPlayersWithMatchesInDB());
                 } else {
                     pool->set_filter(ValuePool::SkipExistingMatchesInDB());
                 }

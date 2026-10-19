@@ -438,13 +438,13 @@ const std::string& TemplateManager::GetStarterChallengerDatabaseJson() {
           "name": "PUUID",
           "static_value": "",
           "linked": true,
-          "iterative": false,
-          "deduplicate": false,
-          "skip_db": false,
-          "parent_id": 1,
-          "json_keys_before": ["puuid"],
-          "json_keys_after": [],
-          "iter_limit": 0
+          "iterative": true,
+          "deduplicate": true,
+          "skip_db": true,
+          "parent_id": 0,
+          "json_keys_before": ["entries"],
+          "json_keys_after": ["puuid"],
+          "iter_limit": 25
         }
       ],
       "optionals": [
@@ -522,13 +522,13 @@ const std::string& TemplateManager::GetStarterChallengerDatabaseJson() {
           "name": "Match ID",
           "static_value": "",
           "linked": true,
-          "iterative": false,
+          "iterative": true,
           "deduplicate": true,
           "skip_db": true,
-          "parent_id": 3,
-          "json_keys_before": ["metadata", "matchId"],
+          "parent_id": 2,
+          "json_keys_before": [],
           "json_keys_after": [],
-          "iter_limit": 0
+          "iter_limit": 10
         }
       ],
       "optionals": []
@@ -817,24 +817,62 @@ bool TemplateManager::QuickFillRootParameters(
     const std::string& game_name,
     const std::string& tag_line
 ) {
+    auto resolve_routing_for_form = [](const std::shared_ptr<LinkedInterface>& form, const std::string& raw_route) -> std::string {
+        if (raw_route.empty() || !form) return raw_route;
+        int expected_ind = form->get_expected_routing_indicator();
+        if (expected_ind == REGIONAL_INDICATOR) {
+            auto reg = riotcpp::args::str_to_regional(raw_route);
+            if (reg.has_value()) {
+                return riotcpp::args::regional_to_str(reg.value());
+            }
+            auto pf = riotcpp::args::str_to_platform(raw_route);
+            if (pf.has_value()) {
+                return riotcpp::args::regional_to_str(riotcpp::args::platform_to_regional(pf.value()));
+            }
+        } else if (expected_ind == PLATFORM_INDICATOR) {
+            auto pf = riotcpp::args::str_to_platform(raw_route);
+            if (pf.has_value()) {
+                return riotcpp::args::platform_to_str(pf.value());
+            }
+            auto reg = riotcpp::args::str_to_regional(raw_route);
+            if (reg.has_value()) {
+                auto cur_pf = riotcpp::args::str_to_platform(form->get_param_value(0));
+                if (cur_pf.has_value() && riotcpp::args::platform_to_regional(cur_pf.value()) == reg.value()) {
+                    return riotcpp::args::platform_to_str(cur_pf.value());
+                }
+                switch (reg.value()) {
+                    case riotcpp::args::regional::SEA: return "OC1";
+                    case riotcpp::args::regional::ASIA: return "KR";
+                    case riotcpp::args::regional::AMERICAS: return "NA1";
+                    case riotcpp::args::regional::EUROPE: return "EUW1";
+                }
+            }
+        }
+        return raw_route;
+    };
+
     bool found_root = false;
     for (auto& form : batch_form.get_forms()) {
         if (!form) continue;
+        std::string resolved_route = resolve_routing_for_form(form, routing);
 
         if (!form->check_dependent()) {
             // Root form (0 parent dependencies)
             if (form->get_param_count() >= 3) {
-                if (!routing.empty()) form->set_param_value(0, routing);
+                if (!resolved_route.empty()) form->set_param_value(0, resolved_route);
                 if (!game_name.empty()) form->set_param_value(1, game_name);
                 if (!tag_line.empty()) form->set_param_value(2, tag_line);
+                found_root = true;
+            } else if (form->get_param_count() >= 1 && !resolved_route.empty()) {
+                form->set_param_value(0, resolved_route);
                 found_root = true;
             }
         }
 
         // Propagate Routing region to any unlinked Routing parameter slots across the entire DAG
-        if (!routing.empty() && form->get_param_count() >= 1 && !form->is_param_linked(0)) {
+        if (!resolved_route.empty() && form->get_param_count() >= 1 && !form->is_param_linked(0)) {
             if (form->get_param_name(0) == "Routing") {
-                form->set_param_value(0, routing);
+                form->set_param_value(0, resolved_route);
             }
         }
 

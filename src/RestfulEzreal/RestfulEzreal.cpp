@@ -196,7 +196,7 @@ namespace restfulEz {
                 this->render_client_config();
                 break;
             case current_page::REQUEST_HISTORY:
-                this->render_json();
+                this->render_request_history();
                 break;
             case current_page::REQUEST_STATUS:
                 this->render_rate_status();
@@ -1149,12 +1149,108 @@ namespace restfulEz {
         }
     }
 
-    void RestfulEzreal::render_json() {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
-        ImGui::TextUnformatted("Request History & Raw JSON Inspector");
-        ImGui::PopStyleColor();
-        ImGui::SameLine();
-        ImGui::TextDisabled("| Browse and view saved JSON responses from the active workspace");
+    static void RenderQueryResultTable(const char* table_id, const QueryResult& qr, float height = 200.0f) {
+        if (!qr.success || qr.column_names.empty()) {
+            ImGui::TextDisabled("No data available in current table/query.");
+            return;
+        }
+        if (qr.rows.empty()) {
+            ImGui::TextDisabled("Query returned 0 rows.");
+            return;
+        }
+        int col_count = static_cast<int>(qr.column_names.size());
+        if (ImGui::BeginTable(table_id, col_count, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable, ImVec2(0, height))) {
+            for (const auto& col_name : qr.column_names) {
+                ImGui::TableSetupColumn(col_name.c_str());
+            }
+            ImGui::TableHeadersRow();
+
+            for (const auto& row : qr.rows) {
+                ImGui::TableNextRow();
+                for (int c = 0; c < col_count && c < static_cast<int>(row.size()); ++c) {
+                    ImGui::TableSetColumnIndex(c);
+                    ImGui::TextUnformatted(row[c].c_str());
+                }
+            }
+            ImGui::EndTable();
+        }
+    }
+
+    void RestfulEzreal::refresh_duckdb_analytics() {
+        DatabaseManager& db = DatabaseManager::GetInstance();
+        if (!db.IsInitialized()) {
+            return;
+        }
+        this->_cached_table_counts = db.GetTableCounts();
+        this->_cached_champion_stats = db.GetChampionPerformanceSummary(20);
+        this->_cached_player_stats = db.GetTopTrackedPlayersSummary(20);
+        this->_cached_timeline_stats = db.GetTimelineFramesSummary();
+        this->_cached_event_stats = db.GetTimelineEventsSummary();
+        this->_analytics_last_refresh_frame = ImGui::GetFrameCount();
+    }
+
+    void RestfulEzreal::execute_custom_sql() {
+        DatabaseManager& db = DatabaseManager::GetInstance();
+        if (!db.IsInitialized()) {
+            this->_query_has_error = true;
+            this->_query_status_message = "Database is not initialized.";
+            return;
+        }
+        this->_current_query_result = db.ExecuteQuery(this->_sql_query_input);
+        if (this->_current_query_result.success) {
+            this->_query_has_error = false;
+            std::ostringstream ss;
+            ss << "Query returned " << this->_current_query_result.row_count << " rows in "
+               << std::fixed << std::setprecision(2) << this->_current_query_result.execution_time_ms << " ms";
+            this->_query_status_message = ss.str();
+        } else {
+            this->_query_has_error = true;
+            this->_query_status_message = this->_current_query_result.error_message;
+        }
+    }
+
+    void RestfulEzreal::export_current_query_csv() {
+        DatabaseManager& db = DatabaseManager::GetInstance();
+        if (!db.IsInitialized()) {
+            this->_export_status_message = "Error: Database is not initialized.";
+            return;
+        }
+        auto export_dir = FileManager::GetInstance().GetWorkspacePaths().root_dir / "exports";
+        std::filesystem::create_directories(export_dir);
+        auto now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        std::string filename = "query_result_" + std::to_string(now) + ".csv";
+        std::filesystem::path out_path = export_dir / filename;
+        if (db.ExportQueryToCSV(this->_sql_query_input, out_path.string())) {
+            this->_export_status_message = "Successfully exported to " + out_path.string();
+        } else {
+            this->_export_status_message = "Export failed. Check query syntax and directory permissions.";
+        }
+    }
+
+    void RestfulEzreal::export_table_csv(const std::string& table_name) {
+        DatabaseManager& db = DatabaseManager::GetInstance();
+        if (!db.IsInitialized()) {
+            this->_export_status_message = "Error: Database is not initialized.";
+            return;
+        }
+        auto export_dir = FileManager::GetInstance().GetWorkspacePaths().root_dir / "exports";
+        std::filesystem::create_directories(export_dir);
+        std::filesystem::path out_path = export_dir / (table_name + ".csv");
+        if (db.ExportTableToCSV(table_name, out_path.string())) {
+            this->_export_status_message = "Successfully exported table " + table_name + " to " + out_path.string();
+        } else {
+            this->_export_status_message = "Export failed for table " + table_name;
+        }
+    }
+
+    void RestfulEzreal::render_tab_workspace_overview() {
+        auto& ws = FileManager::GetInstance().GetWorkspacePaths();
+        auto& db = DatabaseManager::GetInstance();
+
+        ImGui::TextDisabled("Workspace: %s  |  DuckDB: %s (%s)",
+            ws.root_dir.string().c_str(),
+            db.GetDatabasePath().c_str(),
+            db.IsInitialized() ? "Connected" : "Offline");
         ImGui::Separator();
         ImGui::Spacing();
 
@@ -1176,7 +1272,6 @@ namespace restfulEz {
         ImGui::TextDisabled("(%zu files found in workspace raw storage)", this->_cached_file_list.size());
         ImGui::Spacing();
 
-        ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), 80.0f));
         float avail_h = ImGui::GetContentRegionAvail().y;
         ImGui::BeginChild("HistoryFileListPanel", ImVec2(380.0f, avail_h), true);
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
@@ -1248,6 +1343,230 @@ namespace restfulEz {
             ImGui::TextDisabled("Select a response file from the list on the left to inspect its formatted JSON content.");
         }
         ImGui::EndChild();
+    }
+
+    void RestfulEzreal::render_tab_duckdb_analytics() {
+        int current_frame = ImGui::GetFrameCount();
+        if (this->_analytics_last_refresh_frame < 0 || current_frame - this->_analytics_last_refresh_frame > 300) {
+            this->refresh_duckdb_analytics();
+        }
+
+        // Header Controls
+        if (ImGui::Button("Refresh Analytics")) {
+            this->refresh_duckdb_analytics();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Backfill Unnested Timeline Tables")) {
+            int64_t count = DatabaseManager::GetInstance().BackfillUnnestedTimelines();
+            this->_backfill_status_message = "Backfilled " + std::to_string(count) + " unnested timeline records.";
+            this->refresh_duckdb_analytics();
+        }
+        if (!this->_backfill_status_message.empty()) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(0.2f, 0.85f, 0.3f, 1.0f), "%s", this->_backfill_status_message.c_str());
+        }
+        ImGui::Spacing();
+
+        // Section 1: Live Table Counts Card (6 metrics)
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::TextUnformatted("DuckDB Live Ingestion Telemetry");
+        ImGui::PopStyleColor();
+
+        if (ImGui::BeginTable("TableCountsGrid", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+            ImGui::TableSetupColumn("Players");
+            ImGui::TableSetupColumn("Matches");
+            ImGui::TableSetupColumn("Participants");
+            ImGui::TableSetupColumn("Timelines");
+            ImGui::TableSetupColumn("Participant Frames");
+            ImGui::TableSetupColumn("Timeline Events");
+            ImGui::TableHeadersRow();
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(0.92f, 0.68f, 0.01f, 1.0f), "%ld", static_cast<long>(this->_cached_table_counts.players));
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextColored(ImVec4(0.92f, 0.68f, 0.01f, 1.0f), "%ld", static_cast<long>(this->_cached_table_counts.matches));
+            ImGui::TableSetColumnIndex(2);
+            ImGui::TextColored(ImVec4(0.92f, 0.68f, 0.01f, 1.0f), "%ld", static_cast<long>(this->_cached_table_counts.match_participants));
+            ImGui::TableSetColumnIndex(3);
+            ImGui::TextColored(ImVec4(0.92f, 0.68f, 0.01f, 1.0f), "%ld", static_cast<long>(this->_cached_table_counts.match_timelines));
+            ImGui::TableSetColumnIndex(4);
+            ImGui::TextColored(ImVec4(0.92f, 0.68f, 0.01f, 1.0f), "%ld", static_cast<long>(this->_cached_table_counts.timeline_participant_frames));
+            ImGui::TableSetColumnIndex(5);
+            ImGui::TextColored(ImVec4(0.92f, 0.68f, 0.01f, 1.0f), "%ld", static_cast<long>(this->_cached_table_counts.timeline_events));
+
+            ImGui::EndTable();
+        }
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Section 2: Champion Performance Summary Table
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::TextUnformatted("Champion Performance Summary (match_participants)");
+        ImGui::PopStyleColor();
+        RenderQueryResultTable("ChampionPerfTable", this->_cached_champion_stats, 180.0f);
+        ImGui::Spacing();
+
+        // Section 3: Top Tracked Players Summary Table
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::TextUnformatted("Top Tracked Players Summary (players & match_participants)");
+        ImGui::PopStyleColor();
+        RenderQueryResultTable("TopPlayersSummaryTable", this->_cached_player_stats, 160.0f);
+        ImGui::Spacing();
+
+        // Section 4: Timeline Analytics Summary
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::TextUnformatted("Timeline Analytics: Minute-by-Minute Gold & XP Progression");
+        ImGui::PopStyleColor();
+        RenderQueryResultTable("TimelineFramesSummaryTable", this->_cached_timeline_stats, 160.0f);
+        ImGui::Spacing();
+
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::TextUnformatted("Timeline Analytics: Objective & Kill Events Breakdown");
+        ImGui::PopStyleColor();
+        RenderQueryResultTable("TimelineEventsSummaryTable", this->_cached_event_stats, 160.0f);
+    }
+
+    void RestfulEzreal::render_tab_sql_export() {
+        if (this->_current_query_result.column_names.empty() && !this->_query_has_error && strlen(this->_sql_query_input) > 0) {
+            this->execute_custom_sql();
+        }
+
+        // Section 1: Preset Query Buttons
+        ImGui::TextDisabled("Preset Analytical Queries:");
+        ImGui::SameLine();
+        if (ImGui::Button("Top Champions")) {
+            strncpy(this->_sql_query_input,
+                "SELECT champion_name AS \"Champion\", COUNT(*) AS \"Picks\", "
+                "SUM(CASE WHEN win THEN 1 ELSE 0 END) AS \"Wins\", "
+                "ROUND(100.0 * SUM(CASE WHEN win THEN 1 ELSE 0 END) / COUNT(*), 1) AS \"Winrate %\", "
+                "ROUND(AVG(kills), 1) AS \"Avg K\", ROUND(AVG(deaths), 1) AS \"Avg D\", ROUND(AVG(assists), 1) AS \"Avg A\" "
+                "FROM match_participants GROUP BY champion_name ORDER BY \"Picks\" DESC LIMIT 20;",
+                sizeof(this->_sql_query_input) - 1);
+            this->execute_custom_sql();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Player Winrates")) {
+            strncpy(this->_sql_query_input,
+                "SELECT COALESCE(NULLIF(TRIM(p.current_game_name || '#' || p.current_tag_line), '#'), mp.game_name || '#' || mp.tag_line, mp.player_id) AS \"Riot ID\", "
+                "COUNT(DISTINCT mp.match_id) AS \"Matches\", SUM(CASE WHEN mp.win THEN 1 ELSE 0 END) AS \"Wins\", "
+                "ROUND(100.0 * SUM(CASE WHEN mp.win THEN 1 ELSE 0 END) / COUNT(DISTINCT mp.match_id), 1) AS \"Winrate %\" "
+                "FROM match_participants mp LEFT JOIN players p ON mp.player_id = p.player_id "
+                "GROUP BY 1 ORDER BY \"Matches\" DESC LIMIT 20;",
+                sizeof(this->_sql_query_input) - 1);
+            this->execute_custom_sql();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("15m Gold Diff")) {
+            strncpy(this->_sql_query_input,
+                "SELECT match_id, frame_index AS \"Minute\", participant_id, total_gold, xp, minions_killed "
+                "FROM timeline_participant_frames WHERE frame_index = 15 ORDER BY total_gold DESC LIMIT 20;",
+                sizeof(this->_sql_query_input) - 1);
+            this->execute_custom_sql();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Objective Events")) {
+            strncpy(this->_sql_query_input,
+                "SELECT event_type AS \"Event\", monster_type, monster_sub_type, killer_id, team_id, "
+                "ROUND(timestamp / 60000.0, 1) AS \"Minute\" "
+                "FROM timeline_events WHERE event_type IN ('ELITE_MONSTER_KILL', 'BUILDING_KILL', 'CHAMPION_KILL') "
+                "ORDER BY timestamp ASC LIMIT 50;",
+                sizeof(this->_sql_query_input) - 1);
+            this->execute_custom_sql();
+        }
+        ImGui::Spacing();
+
+        // Section 2: Multi-line SQL Query Input
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::TextUnformatted("Interactive Read-Only SQL Query");
+        ImGui::PopStyleColor();
+        ImGui::InputTextMultiline("##SQLQueryInput", this->_sql_query_input, sizeof(this->_sql_query_input), ImVec2(-1.0f, 90.0f));
+
+        // Section 3: Action Buttons & Feedback
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.72f, 0.52f, 0.01f, 1.0f));
+        if (ImGui::Button("Run Query")) {
+            this->execute_custom_sql();
+        }
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        if (ImGui::Button("Clear")) {
+            this->_sql_query_input[0] = '\0';
+            this->_current_query_result = QueryResult{};
+            this->_query_status_message.clear();
+            this->_query_has_error = false;
+        }
+        ImGui::SameLine();
+        if (this->_query_has_error) {
+            ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "%s", this->_query_status_message.c_str());
+        } else if (!this->_query_status_message.empty()) {
+            ImGui::TextColored(ImVec4(0.2f, 0.85f, 0.3f, 1.0f), "%s", this->_query_status_message.c_str());
+        }
+        ImGui::Spacing();
+
+        // Section 4: Dynamic Results Table
+        RenderQueryResultTable("CustomQueryResultTable", this->_current_query_result, 240.0f);
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Section 5: CSV Exporters Toolbar
+        if (ImGui::Button("Export Current Query to CSV")) {
+            this->export_current_query_csv();
+        }
+        ImGui::SameLine();
+
+        static const char* export_tables[] = {
+            "matches", "match_participants", "players", "player_aliases",
+            "match_timelines", "timeline_participant_frames", "timeline_events"
+        };
+        ImGui::SetNextItemWidth(200.0f);
+        ImGui::Combo("##ExportTableCombo", &this->_export_table_selected, export_tables, IM_ARRAYSIZE(export_tables));
+        ImGui::SameLine();
+        if (ImGui::Button("Export Table to CSV")) {
+            this->export_table_csv(export_tables[this->_export_table_selected]);
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(Destination: ./output/exports/)");
+
+        if (!this->_export_status_message.empty()) {
+            ImGui::Spacing();
+            if (this->_export_status_message.rfind("Error", 0) == 0 || this->_export_status_message.rfind("Export failed", 0) == 0) {
+                ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "%s", this->_export_status_message.c_str());
+            } else {
+                ImGui::TextColored(ImVec4(0.2f, 0.85f, 0.3f, 1.0f), "%s", this->_export_status_message.c_str());
+            }
+        }
+    }
+
+    void RestfulEzreal::render_request_history() {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.68f, 0.01f, 1.0f));
+        ImGui::TextUnformatted("Request History & DuckDB Analytics");
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        ImGui::TextDisabled("| Workspace responses, analytics dashboards, and interactive SQL query explorer");
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::BeginTabBar("RequestHistoryTabBar", ImGuiTabBarFlags_None)) {
+            if (ImGui::BeginTabItem("Workspace Files & DB Overview")) {
+                this->render_tab_workspace_overview();
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("DuckDB Analytics & Explorer")) {
+                this->render_tab_duckdb_analytics();
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("SQL Query & Export")) {
+                this->render_tab_sql_export();
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
+    }
+
+    void RestfulEzreal::render_json() {
+        this->render_request_history();
     }
 
     void RestfulEzreal::render_rate_status() {

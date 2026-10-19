@@ -577,6 +577,144 @@ int main() {
         std::cout << "  [PASS] Incremental Challenger player database growth via SkipExistingPlayersInDB" << std::endl;
     }
 
+    // =========================================================================
+    // Test 7: Incremental Challenger Match Ingestion with SkipPlayersWithMatchesInDB
+    // =========================================================================
+    {
+        std::vector<std::string> queried_matches_run1;
+        std::vector<std::string> queried_matches_run2;
+
+        auto run_challenger_full_batch = [&](std::vector<std::string>& queried_match_puuids) {
+            // Node 0: League-v4 Challenger
+            auto s0_req = std::make_unique<LinkedRequest>();
+            s0_req->_game = 1; s0_req->_endpoint = 3; s0_req->_endpoint_method = 0;
+            s0_req->params = {PARAM_CONT("KR"), PARAM_CONT("RANKED_SOLO_5x5")};
+            auto stage0 = std::make_shared<RequestNode>(std::move(s0_req));
+
+            // Node 1: Account-v1 By PUUID (iter_limit 2, SkipExistingPlayersInDB)
+            auto s1_req = std::make_unique<LinkedRequest>();
+            s1_req->_game = 0; s1_req->_endpoint = 0; s1_req->_endpoint_method = 0;
+            s1_req->params = {PARAM_CONT("ASIA"), PARAM_CONT("")};
+            s1_req->get_or_create_pool(1)->set_deduplicate(true);
+            s1_req->get_or_create_pool(1)->set_filter(ValuePool::SkipExistingPlayersInDB());
+
+            iter_request_link link_0_to_1;
+            link_0_to_1.parent = stage0;
+            link_0_to_1.param_indices = {1};
+            iter_access_info chal_acc_1;
+            chal_acc_1.keys = {KEY_CONT("entries")};
+            chal_acc_1.access_after_iter.keys = {KEY_CONT("puuid")};
+            chal_acc_1.iter_limit = 2;
+            link_0_to_1.iter_link_info.push_back(chal_acc_1);
+            s1_req->iter_dependencies.push_back(link_0_to_1);
+            auto stage1 = std::make_shared<RequestNode>(std::move(s1_req));
+
+            // Node 2: Match-v5 By PUUID (iter_limit 2, SkipPlayersWithMatchesInDB)
+            auto s2_req = std::make_unique<LinkedRequest>();
+            s2_req->_game = 1; s2_req->_endpoint = 6; s2_req->_endpoint_method = 2;
+            s2_req->params = {PARAM_CONT("ASIA"), PARAM_CONT("")};
+            s2_req->get_or_create_pool(1)->set_deduplicate(true);
+            s2_req->get_or_create_pool(1)->set_filter(ValuePool::SkipPlayersWithMatchesInDB(1));
+
+            iter_request_link link_0_to_2;
+            link_0_to_2.parent = stage0;
+            link_0_to_2.param_indices = {1};
+            iter_access_info chal_acc_2;
+            chal_acc_2.keys = {KEY_CONT("entries")};
+            chal_acc_2.access_after_iter.keys = {KEY_CONT("puuid")};
+            chal_acc_2.iter_limit = 2;
+            link_0_to_2.iter_link_info.push_back(chal_acc_2);
+            s2_req->iter_dependencies.push_back(link_0_to_2);
+            auto stage2 = std::make_shared<RequestNode>(std::move(s2_req));
+
+            // Node 3: Match-v5 By Match ID (detail)
+            auto s3_req = std::make_unique<IterativeRequest>();
+            s3_req->_game = 1; s3_req->_endpoint = 6; s3_req->_endpoint_method = 0;
+            s3_req->params = {PARAM_CONT("ASIA"), PARAM_CONT("")};
+            s3_req->param_indices = {1};
+
+            iter_request_link link_2_to_3;
+            link_2_to_3.parent = stage2;
+            link_2_to_3.iter_link_info.push_back(iter_access_info());
+            s3_req->iter_dependencies.push_back(link_2_to_3);
+            auto stage3 = std::make_shared<RequestNode>(std::move(s3_req));
+
+            // DAG wiring
+            stage0->_node->unsent_request->children.push_back(stage1);
+            stage0->_node->unsent_request->children.push_back(stage2);
+            stage2->_node->unsent_request->children.push_back(stage3);
+
+            auto batch = std::make_shared<BatchRequest>(std::vector<std::shared_ptr<RequestNode>>{stage0});
+            {
+                RequestSender sender;
+                sender.set_output_directory(test_ws);
+                sender.set_custom_handler([&](const request& req) -> std::unique_ptr<std::vector<char>> {
+                    if (req._game == 1 && req._endpoint == 3 && req._endpoint_method == 0) {
+                        return make_raw_response(R"({
+                            "tier": "CHALLENGER",
+                            "entries": [
+                                {"puuid": "PUUID_FULL_1"},
+                                {"puuid": "PUUID_FULL_2"},
+                                {"puuid": "PUUID_FULL_3"},
+                                {"puuid": "PUUID_FULL_4"}
+                            ]
+                        })");
+                    }
+                    if (req._game == 0 && req._endpoint == 0 && req._endpoint_method == 0) {
+                        std::string p = req.params[1].param;
+                        return make_raw_response(
+                            std::string(R"({"puuid":")") + p + R"(","gameName":"Name_)" + p + R"(","tagLine":"KR1"})"
+                        );
+                    }
+                    if (req._game == 1 && req._endpoint == 6 && req._endpoint_method == 2) {
+                        std::string p = req.params[1].param;
+                        queried_match_puuids.push_back(p);
+                        return make_raw_response(R"(["KR_MATCH_)" + p + R"("])");
+                    }
+                    if (req._game == 1 && req._endpoint == 6 && req._endpoint_method == 0) {
+                        std::string mid = req.params[1].param;
+                        std::string p = mid.substr(9); // "KR_MATCH_" is 9 chars
+                        std::string match_json = std::string(R"({
+                            "metadata": {"matchId": ")") + mid + R"("},
+                            "info": {
+                                "gameCreation": 1700000000000,
+                                "gameDuration": 1800,
+                                "gameVersion": "14.15.1",
+                                "queueId": 420,
+                                "participants": [
+                                    {"participantId": 1, "puuid": ")" + p + R"(", "riotIdGameName": "Name_)" + p + R"(", "riotIdTagline": "KR1", "championName": "Ahri", "championId": 103, "teamId": 100, "kills": 5, "deaths": 1, "assists": 8, "win": true}
+                                ]
+                            }
+                        })";
+                        return make_raw_response(match_json);
+                    }
+                    return nullptr;
+                });
+                sender.add_batch_request(batch);
+            }
+        };
+
+        // Run 1: Should ingest matches for PUUID_FULL_1 and PUUID_FULL_2
+        run_challenger_full_batch(queried_matches_run1);
+        assert(queried_matches_run1.size() == 2);
+        assert(queried_matches_run1[0] == "PUUID_FULL_1");
+        assert(queried_matches_run1[1] == "PUUID_FULL_2");
+        assert(db.HasMatchesForPlayerPuuid("PUUID_FULL_1", 1));
+        assert(db.HasMatchesForPlayerPuuid("PUUID_FULL_2", 1));
+        assert(!db.HasMatchesForPlayerPuuid("PUUID_FULL_3", 1));
+        assert(!db.HasMatchesForPlayerPuuid("PUUID_FULL_4", 1));
+
+        // Run 2: SkipPlayersWithMatchesInDB skips FULL_1 & FULL_2 and ingests FULL_3 & FULL_4!
+        run_challenger_full_batch(queried_matches_run2);
+        assert(queried_matches_run2.size() == 2);
+        assert(queried_matches_run2[0] == "PUUID_FULL_3");
+        assert(queried_matches_run2[1] == "PUUID_FULL_4");
+        assert(db.HasMatchesForPlayerPuuid("PUUID_FULL_3", 1));
+        assert(db.HasMatchesForPlayerPuuid("PUUID_FULL_4", 1));
+
+        std::cout << "  [PASS] Multi-run batch advancement on Challenger players with SkipPlayersWithMatchesInDB" << std::endl;
+    }
+
     db.Close();
     std::filesystem::remove_all(test_ws);
 
